@@ -785,18 +785,28 @@ async function startServer() {
     await dataService.initialize();
     console.log('✅ Data service initialized successfully');
     
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📱 Local access: http://localhost:${PORT}`);
       console.log(`🌐 Railway URL: https://stock-management-system-production-0142.up.railway.app`);
       console.log(`✅ Stock Management System is ready!`);
     });
+    
+    // Bind to all interfaces (0.0.0.0)
+    server.on('listening', () => {
+      console.log(`💻 Server bound to all interfaces (0.0.0.0:${PORT})`);
+    });
   } catch (error) {
     console.error('❌ Failed to initialize server:', error);
     // Try to start anyway with sample data
     console.log('🔄 Starting with sample data...');
-    app.listen(PORT, '0.0.0.0', () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT} (with fallback data)`);
+    });
+    
+    // Bind to all interfaces (0.0.0.0)
+    server.on('listening', () => {
+      console.log(`💻 Server bound to all interfaces (0.0.0.0:${PORT}) - with fallback data`);
     });
   }
 }

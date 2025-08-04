@@ -66,13 +66,6 @@ export const Button: React.FC<ButtonProps> = ({
 }) => {
   const baseStyles = 'font-semibold rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed border-2';
   
-  const variants = {
-    primary: `bg-[${theme.fernGreen}] hover:bg-[${theme.fernGreenDark}] text-white border-[${theme.fernGreenDark}] focus:ring-[${theme.fernGreen}]`,
-    secondary: `bg-[${theme.navbarLinkBg}] hover:bg-[${theme.navbarLinkHover}] hover:text-white text-[${theme.black}] border-[${theme.fernGreen}] focus:ring-[${theme.fernGreen}]`,
-    outline: `bg-transparent border-[${theme.fernGreen}] text-[${theme.fernGreen}] hover:bg-[${theme.fernGreen}] hover:text-white focus:ring-[${theme.fernGreen}]`,
-    accent: `bg-[${theme.accent}] hover:bg-[${theme.fernGreen}] hover:text-white text-[${theme.black}] border-[${theme.fernGreen}] focus:ring-[${theme.fernGreen}]`
-  };
-
   const sizes = {
     sm: 'px-4 py-2 text-sm',
     md: 'px-6 py-3 text-base',
@@ -140,14 +133,6 @@ export const Badge: React.FC<BadgeProps> = ({
   size = 'md',
   dot = false
 }) => {
-  const variants = {
-    success: 'bg-green-100 text-green-800 border-green-200',
-    warning: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    danger: 'bg-red-100 text-red-800 border-red-200',
-    info: 'bg-blue-100 text-blue-800 border-blue-200',
-    primary: `text-[${theme.fernGreenDark}] border-[${theme.fernGreen}]`
-  };
-
   const sizes = {
     sm: 'px-2 py-1 text-xs',
     md: 'px-3 py-1 text-sm',

@@ -14,29 +14,16 @@
     "start:server": "cd server && npm start",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "install:all": "npm install && cd server && npm install",
-    "railway-build": "npm install && npm run build:prod && cd server && npm install && npm run build",
     "start": "cd server && npm start",
     "start:prod": "cd server && npm start"
   },
   "dependencies": {
     "@tailwindcss/forms": "^0.5.10",
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "^24.1.0",
-    "@types/uuid": "^10.0.0",
-    "bcryptjs": "^3.0.2",
-    "cors": "^2.8.5",
     "date-fns": "^4.1.0",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.536.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "recharts": "^3.1.0",
-    "uuid": "^11.1.0"
+    "recharts": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

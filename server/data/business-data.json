@@ -2,46 +2,7 @@
   "products": [],
   "stockInEntries": [],
   "stockOutEntries": [],
-  "customerDebts": [
-    {
-      "id": "aab48204-0998-4253-a714-e5bee69a7eb1",
-      "saleId": "df1ea93d-82ea-4ccf-bbef-d12576b58760",
-      "saleDate": "2024-07-18T00:00:00.000Z",
-      "customerName": "Alice Brown",
-      "customerContact": "",
-      "productCode": "FLOUR001",
-      "productName": "Wheat Flour 10kg",
-      "quantity": 3,
-      "totalSale": 54,
-      "amountPaid": 0,
-      "balance": 54,
-      "paymentReceived": 30,
-      "remainingBalance": 24,
-      "dueDate": "2024-08-17T00:00:00.000Z",
-      "status": "unpaid",
-      "createdAt": "2025-08-04T09:31:05.395Z",
-      "updatedAt": "2025-08-04T09:31:05.395Z"
-    },
-    {
-      "id": "f8192a30-0d5a-489a-b4eb-2d43b0a62e90",
-      "saleId": "2b1e67b0-0976-4796-a6b5-0fb3184065b1",
-      "saleDate": "2024-07-06T00:00:00.000Z",
-      "customerName": "Jane Smith",
-      "customerContact": "",
-      "productCode": "OIL001",
-      "productName": "Cooking Oil 1L",
-      "quantity": 5,
-      "totalSale": 27.5,
-      "amountPaid": 20,
-      "balance": 7.5,
-      "paymentReceived": 7.5,
-      "remainingBalance": 0,
-      "dueDate": "2024-08-05T00:00:00.000Z",
-      "status": "paid",
-      "createdAt": "2025-08-04T09:31:05.395Z",
-      "updatedAt": "2025-08-04T09:31:05.395Z"
-    }
-  ],
+  "customerDebts": [],
   "payments": [
     {
       "debtId": "aab48204-0998-4253-a714-e5bee69a7eb1",
@@ -536,5 +497,5 @@
       "lastLogin": "2025-08-04T10:40:30.580Z"
     }
   ],
-  "lastUpdated": "2025-08-04T14:41:10.775Z"
+  "lastUpdated": "2025-08-04T15:00:27.015Z"
 }

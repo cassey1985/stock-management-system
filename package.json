@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b --force && vite build",
@@ -14,6 +17,7 @@
     "start:server": "cd server && npm start",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
     "install:all": "npm install && cd server && npm install",
+    "railway-build": "echo 'Building server...' && cd server && npm install --production=false && npm run build",
     "start": "cd server && npm start",
     "start:prod": "cd server && npm start"
   },

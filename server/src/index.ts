@@ -146,18 +146,21 @@ app.get('/', (req, res) => {
     </head>
     <body>
         <div class="container">
-            <h1>🏪 Stock Management System</h1>
+            <div style="margin-bottom: 20px;">
+                <img src="https://img.icons8.com/color/96/000000/inventory-management.png" alt="Stock Management Logo" style="width: 80px; height: 80px;">
+            </div>
+            <h1>Stock Management System</h1>
             <p class="subtitle">Professional FIFO Inventory Management</p>
             
             <div class="login-form">
-                <input type="text" id="username" placeholder="Username" />
-                <input type="password" id="password" placeholder="Password" />
+                <input type="text" id="username" placeholder="Username" value="admin" />
+                <input type="password" id="password" placeholder="Password" value="admin123" />
                 <button onclick="login()">Login</button>
             </div>
             
             <div id="status"></div>
             
-            <div class="credentials">
+            <div class="credentials" style="display: none;">
                 <h3>📝 Default Login Credentials:</h3>
                 <div class="credential-item"><strong>Admin:</strong> admin / admin123</div>
                 <div class="credential-item"><strong>Sales:</strong> sales01 / sales123</div>
@@ -204,9 +207,89 @@ app.get('/', (req, res) => {
                         localStorage.setItem('authToken', data.token);
                         localStorage.setItem('user', JSON.stringify(data.user));
                         
-                        setTimeout(() => {
-                            status.innerHTML += '<div class="success">📊 You can now access the API endpoints above or build your frontend!</div>';
-                        }, 1000);
+                        // Create a dashboard page
+                        document.body.innerHTML = \`
+                        <div style="background: white; max-width: 1200px; margin: 0 auto; min-height: 100vh; padding: 20px;">
+                            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee;">
+                                <div style="display: flex; align-items: center;">
+                                    <img src="https://img.icons8.com/color/96/000000/inventory-management.png" alt="Logo" style="width: 40px; margin-right: 10px;">
+                                    <h1 style="margin: 0; font-size: 20px;">Stock Management System</h1>
+                                </div>
+                                <div>
+                                    <span style="margin-right: 20px;">Welcome, \${data.user.fullName}</span>
+                                    <button onclick="logout()" style="background: #dc3545; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Logout</button>
+                                </div>
+                            </header>
+                            
+                            <div id="dashboard" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px;">
+                                <div class="loading">Loading dashboard data...</div>
+                            </div>
+                            
+                            <script>
+                                async function loadDashboard() {
+                                    try {
+                                        const response = await fetch('/api/dashboard', {
+                                            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('authToken') }
+                                        });
+                                        const data = await response.json();
+                                        displayDashboard(data);
+                                    } catch (error) {
+                                        console.error('Error loading dashboard:', error);
+                                        document.getElementById('dashboard').innerHTML = '<div class="error">Error loading dashboard data</div>';
+                                    }
+                                }
+                                
+                                function displayDashboard(data) {
+                                    const dashboard = document.getElementById('dashboard');
+                                    dashboard.innerHTML = '';
+                                    
+                                    // Add metric cards
+                                    addMetricCard('Products', data.totalProducts, '#28a745');
+                                    addMetricCard('Stock Value', '$' + data.totalStockValue.toFixed(2), '#007bff');
+                                    addMetricCard('Total Sales', '$' + data.totalSales.toFixed(2), '#17a2b8');
+                                    addMetricCard('Profit', '$' + data.totalProfit.toFixed(2), '#ffc107');
+                                    
+                                    // Add navigation links
+                                    addNavCard('Products', 'Manage your product catalog', '/api/products');
+                                    addNavCard('Inventory', 'Check stock levels and history', '/api/inventory');
+                                    addNavCard('Sales', 'View sales records and trends', '/api/transactions');
+                                    addNavCard('Reports', 'Generate business reports', '#');
+                                }
+                                
+                                function addMetricCard(title, value, color) {
+                                    const dashboard = document.getElementById('dashboard');
+                                    const card = document.createElement('div');
+                                    card.style = \`background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); border-top: 3px solid \${color};\`;
+                                    card.innerHTML = \`
+                                        <h3 style="margin: 0; color: #333;">\${title}</h3>
+                                        <p style="font-size: 24px; font-weight: bold; margin: 10px 0 0; color: \${color}">\${value}</p>
+                                    \`;
+                                    dashboard.appendChild(card);
+                                }
+                                
+                                function addNavCard(title, description, link) {
+                                    const dashboard = document.getElementById('dashboard');
+                                    const card = document.createElement('div');
+                                    card.style = \`background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); cursor: pointer;\`;
+                                    card.innerHTML = \`
+                                        <h3 style="margin: 0; color: #333;">\${title}</h3>
+                                        <p style="color: #666; margin: 5px 0 10px;">\${description}</p>
+                                        <a href="\${link}" target="_blank" style="color: #007bff; text-decoration: none;">View &rarr;</a>
+                                    \`;
+                                    dashboard.appendChild(card);
+                                }
+                                
+                                function logout() {
+                                    localStorage.removeItem('authToken');
+                                    localStorage.removeItem('user');
+                                    window.location.href = '/';
+                                }
+                                
+                                // Load dashboard on page load
+                                loadDashboard();
+                            </script>
+                        </div>
+                        \`;
                     } else {
                         status.innerHTML = \`<div class="error">❌ \${data.error}</div>\`;
                     }
@@ -336,8 +419,8 @@ app.post('/api/users/:id/change-password', authenticateToken, async (req: AuthRe
   }
 });
 
-// Dashboard (Admin only)
-app.get('/api/dashboard', authenticateToken, requireAdmin, (req, res) => {
+// Dashboard (All authenticated users)
+app.get('/api/dashboard', authenticateToken, (req, res) => {
   try {
     const stats = dataService.getDashboardStats();
     res.json(stats);

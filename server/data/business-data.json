@@ -4,26 +4,6 @@
   "stockOutEntries": [],
   "customerDebts": [
     {
-      "id": "f8192a30-0d5a-489a-b4eb-2d43b0a62e90",
-      "saleId": "2b1e67b0-0976-4796-a6b5-0fb3184065b1",
-      "saleDate": "2024-07-06T00:00:00.000Z",
-      "customerName": "Jane Smith",
-      "customerContact": "",
-      "productCode": "OIL001",
-      "productName": "Cooking Oil 1L",
-      "quantity": 5,
-      "totalSale": 27.5,
-      "amountPaid": 20,
-      "balance": 7.5,
-      "paymentReceived": 7.5,
-      "remainingBalance": 0,
-      "dueDate": "2024-08-05T00:00:00.000Z",
-      "status": "paid",
-      "createdAt": "2025-08-04T09:31:05.395Z",
-      "updatedAt": "2025-08-04T09:31:05.395Z",
-      "issueDate": "1970-01-01T00:00:00.000Z"
-    },
-    {
       "id": "aab48204-0998-4253-a714-e5bee69a7eb1",
       "saleId": "df1ea93d-82ea-4ccf-bbef-d12576b58760",
       "saleDate": "2024-07-18T00:00:00.000Z",
@@ -40,22 +20,29 @@
       "dueDate": "2024-08-17T00:00:00.000Z",
       "status": "unpaid",
       "createdAt": "2025-08-04T09:31:05.395Z",
-      "updatedAt": "2025-08-04T09:31:05.395Z",
-      "issueDate": "1970-01-01T00:00:00.000Z"
+      "updatedAt": "2025-08-04T09:31:05.395Z"
+    },
+    {
+      "id": "f8192a30-0d5a-489a-b4eb-2d43b0a62e90",
+      "saleId": "2b1e67b0-0976-4796-a6b5-0fb3184065b1",
+      "saleDate": "2024-07-06T00:00:00.000Z",
+      "customerName": "Jane Smith",
+      "customerContact": "",
+      "productCode": "OIL001",
+      "productName": "Cooking Oil 1L",
+      "quantity": 5,
+      "totalSale": 27.5,
+      "amountPaid": 20,
+      "balance": 7.5,
+      "paymentReceived": 7.5,
+      "remainingBalance": 0,
+      "dueDate": "2024-08-05T00:00:00.000Z",
+      "status": "paid",
+      "createdAt": "2025-08-04T09:31:05.395Z",
+      "updatedAt": "2025-08-04T09:31:05.395Z"
     }
   ],
   "payments": [
-    {
-      "debtId": "f8192a30-0d5a-489a-b4eb-2d43b0a62e90",
-      "customerName": "Jane Smith",
-      "amount": 7.5,
-      "paymentDate": "2024-07-08T00:00:00.000Z",
-      "paymentMethod": "cash",
-      "notes": "Partial payment for oil purchase",
-      "id": "ced5b8b5-e4cf-4bb4-b443-466a4ac42d13",
-      "createdAt": "2025-08-04T09:31:05.395Z",
-      "date": "1970-01-01T00:00:00.000Z"
-    },
     {
       "debtId": "aab48204-0998-4253-a714-e5bee69a7eb1",
       "customerName": "Alice Brown",
@@ -66,9 +53,37 @@
       "id": "62156463-918e-4bdf-a9b9-8887dcca4699",
       "createdAt": "2025-08-04T09:31:05.395Z",
       "date": "1970-01-01T00:00:00.000Z"
+    },
+    {
+      "debtId": "f8192a30-0d5a-489a-b4eb-2d43b0a62e90",
+      "customerName": "Jane Smith",
+      "amount": 7.5,
+      "paymentDate": "2024-07-08T00:00:00.000Z",
+      "paymentMethod": "cash",
+      "notes": "Partial payment for oil purchase",
+      "id": "ced5b8b5-e4cf-4bb4-b443-466a4ac42d13",
+      "createdAt": "2025-08-04T09:31:05.395Z",
+      "date": "1970-01-01T00:00:00.000Z"
     }
   ],
   "generalDebts": [
+    {
+      "type": "payable",
+      "category": "Utility",
+      "description": "Electricity bill for July 2025",
+      "creditorName": "City Electric Company",
+      "originalAmount": 2500,
+      "paidAmount": 0,
+      "remainingBalance": 2500,
+      "dueDate": "2025-08-20T00:00:00.000Z",
+      "issueDate": "2025-07-20T00:00:00.000Z",
+      "priority": "medium",
+      "status": "active",
+      "reference": "ELEC-2025-07",
+      "id": "034ecbb1-2af3-49f7-8fc4-ebddc0a300fd",
+      "createdAt": "2025-08-04T09:31:05.395Z",
+      "updatedAt": "2025-08-04T09:31:05.395Z"
+    },
     {
       "type": "payable",
       "category": "Supplier",
@@ -85,23 +100,6 @@
       "notes": "Monthly bulk purchase agreement",
       "reference": "INV-2025-001",
       "id": "2fea6afe-9b4b-4a4d-a44a-9fcf9f80676b",
-      "createdAt": "2025-08-04T09:31:05.395Z",
-      "updatedAt": "2025-08-04T09:31:05.395Z"
-    },
-    {
-      "type": "payable",
-      "category": "Utility",
-      "description": "Electricity bill for July 2025",
-      "creditorName": "City Electric Company",
-      "originalAmount": 2500,
-      "paidAmount": 0,
-      "remainingBalance": 2500,
-      "dueDate": "2025-08-20T00:00:00.000Z",
-      "issueDate": "2025-07-20T00:00:00.000Z",
-      "priority": "medium",
-      "status": "active",
-      "reference": "ELEC-2025-07",
-      "id": "034ecbb1-2af3-49f7-8fc4-ebddc0a300fd",
       "createdAt": "2025-08-04T09:31:05.395Z",
       "updatedAt": "2025-08-04T09:31:05.395Z"
     },
@@ -126,25 +124,6 @@
     },
     {
       "type": "receivable",
-      "category": "Personal Loan",
-      "description": "Personal loan to employee John",
-      "creditorName": "John Martinez",
-      "creditorContact": "(02) 987-6543",
-      "originalAmount": 5000,
-      "paidAmount": 2000,
-      "remainingBalance": 3000,
-      "dueDate": "2025-12-31T00:00:00.000Z",
-      "issueDate": "2025-06-01T00:00:00.000Z",
-      "priority": "low",
-      "status": "active",
-      "notes": "Emergency personal loan, payable in installments",
-      "reference": "PLOAN-001",
-      "id": "8d20b106-c78e-4ac4-8291-f72035c878f8",
-      "createdAt": "2025-08-04T09:31:05.395Z",
-      "updatedAt": "2025-08-04T09:31:05.395Z"
-    },
-    {
-      "type": "receivable",
       "category": "Advance",
       "description": "Cash advance to supplier for bulk order",
       "creditorName": "Premium Oils Trading",
@@ -159,6 +138,25 @@
       "notes": "Advance payment for premium oil delivery",
       "reference": "ADV-2025-001",
       "id": "fc6ea4f8-d1a1-4dc3-9eea-1791825a4065",
+      "createdAt": "2025-08-04T09:31:05.395Z",
+      "updatedAt": "2025-08-04T09:31:05.395Z"
+    },
+    {
+      "type": "receivable",
+      "category": "Personal Loan",
+      "description": "Personal loan to employee John",
+      "creditorName": "John Martinez",
+      "creditorContact": "(02) 987-6543",
+      "originalAmount": 5000,
+      "paidAmount": 2000,
+      "remainingBalance": 3000,
+      "dueDate": "2025-12-31T00:00:00.000Z",
+      "issueDate": "2025-06-01T00:00:00.000Z",
+      "priority": "low",
+      "status": "active",
+      "notes": "Emergency personal loan, payable in installments",
+      "reference": "PLOAN-001",
+      "id": "8d20b106-c78e-4ac4-8291-f72035c878f8",
       "createdAt": "2025-08-04T09:31:05.395Z",
       "updatedAt": "2025-08-04T09:31:05.395Z"
     }
@@ -511,7 +509,7 @@
       "id": "c52c58d1-96d1-4c24-9e42-61be7b55bf20",
       "createdAt": "2025-08-04T10:38:21.263Z",
       "updatedAt": "2025-08-04T10:38:21.263Z",
-      "lastLogin": "2025-08-04T11:10:28.058Z"
+      "lastLogin": "2025-08-04T14:41:10.756Z"
     },
     {
       "username": "sales01",
@@ -538,5 +536,5 @@
       "lastLogin": "2025-08-04T10:40:30.580Z"
     }
   ],
-  "lastUpdated": "2025-08-04T11:11:23.071Z"
+  "lastUpdated": "2025-08-04T14:41:10.775Z"
 }

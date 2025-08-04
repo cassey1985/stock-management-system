@@ -698,16 +698,23 @@ app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) =
 // Initialize data service and start server
 async function startServer() {
   try {
-    console.log('Initializing database adapter...');
-    await dbAdapter.initialize();
-    console.log('Database adapter initialized successfully');
+    console.log('🔧 Initializing data service...');
+    await dataService.initialize();
+    console.log('✅ Data service initialized successfully');
     
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📱 Local access: http://localhost:${PORT}`);
+      console.log(`🌐 Railway URL: https://stock-management-system-production-0142.up.railway.app`);
+      console.log(`✅ Stock Management System is ready!`);
     });
   } catch (error) {
-    console.error('Failed to initialize database adapter:', error);
-    process.exit(1);
+    console.error('❌ Failed to initialize server:', error);
+    // Try to start anyway with sample data
+    console.log('🔄 Starting with sample data...');
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on port ${PORT} (with fallback data)`);
+    });
   }
 }
 

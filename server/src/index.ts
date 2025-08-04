@@ -22,6 +22,212 @@ const dataService = dbAdapter.getDataService();
 app.use(cors());
 app.use(express.json());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// Serve a simple frontend at root
+app.get('/', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Stock Management System</title>
+        <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            .container { 
+                background: white; 
+                padding: 2rem; 
+                border-radius: 15px; 
+                box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+                max-width: 500px;
+                width: 90%;
+                text-align: center;
+            }
+            h1 { 
+                color: #333; 
+                margin-bottom: 1rem; 
+                font-size: 2rem;
+            }
+            .subtitle {
+                color: #666;
+                margin-bottom: 2rem;
+                font-size: 1.1rem;
+            }
+            .login-form {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+            input {
+                padding: 0.75rem;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                font-size: 1rem;
+                transition: border-color 0.3s;
+            }
+            input:focus {
+                outline: none;
+                border-color: #667eea;
+            }
+            button {
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 0.75rem;
+                border-radius: 8px;
+                font-size: 1rem;
+                cursor: pointer;
+                transition: background 0.3s;
+            }
+            button:hover {
+                background: #5a6fd8;
+            }
+            .credentials {
+                background: #f8f9fa;
+                padding: 1rem;
+                border-radius: 8px;
+                margin-bottom: 1rem;
+                text-align: left;
+            }
+            .credentials h3 {
+                color: #333;
+                margin-bottom: 0.5rem;
+            }
+            .credential-item {
+                margin: 0.25rem 0;
+                font-family: monospace;
+                font-size: 0.9rem;
+            }
+            .api-links {
+                margin-top: 2rem;
+                padding-top: 2rem;
+                border-top: 1px solid #eee;
+            }
+            .api-links h3 {
+                color: #333;
+                margin-bottom: 1rem;
+            }
+            .api-link {
+                display: inline-block;
+                background: #28a745;
+                color: white;
+                text-decoration: none;
+                padding: 0.5rem 1rem;
+                border-radius: 5px;
+                margin: 0.25rem;
+                font-size: 0.9rem;
+                transition: background 0.3s;
+            }
+            .api-link:hover {
+                background: #218838;
+            }
+            .status {
+                margin: 1rem 0;
+                padding: 0.5rem;
+                border-radius: 5px;
+                font-weight: bold;
+            }
+            .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+            .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🏪 Stock Management System</h1>
+            <p class="subtitle">Professional FIFO Inventory Management</p>
+            
+            <div class="login-form">
+                <input type="text" id="username" placeholder="Username" />
+                <input type="password" id="password" placeholder="Password" />
+                <button onclick="login()">Login</button>
+            </div>
+            
+            <div id="status"></div>
+            
+            <div class="credentials">
+                <h3>📝 Default Login Credentials:</h3>
+                <div class="credential-item"><strong>Admin:</strong> admin / admin123</div>
+                <div class="credential-item"><strong>Sales:</strong> sales01 / sales123</div>
+                <div class="credential-item"><strong>Cashier:</strong> cashier01 / cashier123</div>
+            </div>
+            
+            <div class="api-links">
+                <h3>🔗 API Endpoints:</h3>
+                <a href="/api/dashboard" class="api-link" target="_blank">Dashboard Data</a>
+                <a href="/api/products" class="api-link" target="_blank">Products</a>
+                <a href="/api/inventory" class="api-link" target="_blank">Inventory</a>
+                <a href="/api/transactions" class="api-link" target="_blank">Transactions</a>
+            </div>
+            
+            <div style="margin-top: 2rem; color: #666; font-size: 0.9rem;">
+                <p>✅ System Status: <strong style="color: #28a745;">Online</strong></p>
+                <p>🚀 Deployed on Railway</p>
+                <p>💾 Data persisted with file-based storage</p>
+            </div>
+        </div>
+        
+        <script>
+            async function login() {
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
+                const status = document.getElementById('status');
+                
+                if (!username || !password) {
+                    status.innerHTML = '<div class="error">Please enter username and password</div>';
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, password })
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        status.innerHTML = \`<div class="success">✅ Login successful! Welcome, \${data.user.fullName}</div>\`;
+                        localStorage.setItem('authToken', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        
+                        setTimeout(() => {
+                            status.innerHTML += '<div class="success">📊 You can now access the API endpoints above or build your frontend!</div>';
+                        }, 1000);
+                    } else {
+                        status.innerHTML = \`<div class="error">❌ \${data.error}</div>\`;
+                    }
+                } catch (error) {
+                    status.innerHTML = '<div class="error">❌ Login failed. Please try again.</div>';
+                    console.error('Login error:', error);
+                }
+            }
+            
+            // Allow Enter key to submit
+            document.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
+        </script>
+    </body>
+    </html>
+  `);
+});
+
 // Routes
 
 // Authentication Routes

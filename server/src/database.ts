@@ -1,4 +1,5 @@
 import { dataService } from './dataService';
+import type { DataService } from './dataService';
 
 // Database adapter that works with both file system and cloud database
 class DatabaseAdapter {
@@ -19,7 +20,7 @@ class DatabaseAdapter {
 
   // For now, proxy all methods to the existing dataService
   // This allows for future database migration without changing the API
-  getDataService() {
+  getDataService(): DataService {
     return dataService;
   }
 }

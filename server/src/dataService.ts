@@ -1231,4 +1231,5 @@ class DataService {
   }
 }
 
+export { DataService };
 export const dataService = new DataService();

@@ -153,22 +153,18 @@ app.get('/', (req, res) => {
             <p class="subtitle">Professional FIFO Inventory Management</p>
             
             <div class="login-form">
-                <!-- Hidden inputs with default values -->
-                <input type="hidden" id="username" value="admin" />
-                <input type="hidden" id="password" value="admin123" />
-                
-                <!-- Single-click login button -->
-                <button onclick="login()" style="padding: 15px 30px; font-size: 1.1rem; background: linear-gradient(135deg, #4F7942, #228B22); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Login to System</button>
-                <p style="margin-top: 8px; color: #666; font-size: 0.9rem;">(Demo version - click to login as Admin)</p>
+                <input type="text" id="username" placeholder="Username" value="admin" />
+                <input type="password" id="password" placeholder="Password" value="admin123" />
+                <button onclick="login()">Login</button>
             </div>
             
             <div id="status"></div>
             
-            <div class="credentials" style="margin-top: 20px; text-align: center;">
-                <p style="color: #666; font-size: 0.9rem;">
-                    A full-featured FIFO inventory management system<br>
-                    with stock tracking, customer debt tracking, and financial reporting
-                </p>
+            <div class="credentials" style="display: none;">
+                <h3>📝 Default Login Credentials:</h3>
+                <div class="credential-item"><strong>Admin:</strong> admin / admin123</div>
+                <div class="credential-item"><strong>Sales:</strong> sales01 / sales123</div>
+                <div class="credential-item"><strong>Cashier:</strong> cashier01 / cashier123</div>
             </div>
             
             <div class="api-links">
@@ -188,14 +184,16 @@ app.get('/', (req, res) => {
         
         <script>
             async function login() {
-                const username = document.getElementById('username').value || 'admin';
-                const password = document.getElementById('password').value || 'admin123';
+                const username = document.getElementById('username').value;
+                const password = document.getElementById('password').value;
                 const status = document.getElementById('status');
                 
-                status.innerHTML = '<div class="loading">Logging in...</div>';
+                if (!username || !password) {
+                    status.innerHTML = '<div class="error">Please enter username and password</div>';
+                    return;
+                }
                 
                 try {
-                    console.log('Attempting login with:', { username });
                     const response = await fetch('/api/auth/login', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -203,7 +201,6 @@ app.get('/', (req, res) => {
                     });
                     
                     const data = await response.json();
-                    console.log('Login response:', response.status, data);
                     
                     if (response.ok) {
                         status.innerHTML = \`<div class="success">✅ Login successful! Welcome, \${data.user.fullName}</div>\`;

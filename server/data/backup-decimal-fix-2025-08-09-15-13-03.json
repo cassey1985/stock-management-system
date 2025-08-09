@@ -1,4 +1,4 @@
-﻿{
+{
   "products": [
     {
       "code": "IL",
@@ -1284,7 +1284,7 @@
       "creditAmount": 0,
       "date": "2025-07-31T00:00:00.000Z",
       "id": "ae6019b8-dcb8-468d-8b96-3582cab04602",
-      "balance": 91400,
+      "balance": 91400.01,
       "createdAt": "2025-08-06T14:01:13.471Z"
     },
     {
@@ -1296,7 +1296,7 @@
       "creditAmount": 0,
       "date": "2025-07-31T00:00:00.000Z",
       "id": "e9ff0587-39b2-440e-8d54-59162568604f",
-      "balance": 91940,
+      "balance": 91940.01,
       "createdAt": "2025-08-06T14:01:54.336Z"
     },
     {
@@ -1521,7 +1521,7 @@
       "description": "Capital Investment: Opening Receivable - Old debt",
       "reference": "973c0301-ee8a-47e5-b247-67c1627f13c8",
       "debitAmount": 0,
-      "creditAmount": 2400,
+      "creditAmount": 2399.99,
       "date": "2025-07-31T00:00:00.000Z",
       "id": "c18e3e10-0b15-4621-83d4-6efbccd175c9",
       "balance": 93800,
@@ -1533,7 +1533,7 @@
       "description": "Capital Investment: Opening Receivable - Old debt",
       "reference": "78714dde-c019-4641-9573-ad2dff336f0c",
       "debitAmount": 0,
-      "creditAmount": 1860,
+      "creditAmount": 1859.99,
       "date": "2025-07-31T00:00:00.000Z",
       "id": "33c83882-b547-4204-b5db-e68f87047ec5",
       "balance": 93800,
@@ -2034,5 +2034,3 @@
   ],
   "lastUpdated": "2025-08-09T12:08:48.639Z"
 }
-
-

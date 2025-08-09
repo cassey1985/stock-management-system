@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* UIKit inspired theme colors */
+  --fern-green: #4F7942;
+  --fern-green-dark: #35582b;
+  --fern-accent: #e6ffe6;
+  --color-black: #111;
+  --color-white: #fff;
+  
+  font-family: 'Segoe UI', Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  color: var(--color-black);
+  background-color: var(--fern-accent);
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--fern-accent);
+  color: var(--color-black);
+}
+
+/* App container styling */
+#root {
+  min-height: 100vh;
+  background-color: var(--fern-accent);
+  padding: 20px;
+}
+
+/* Override Tailwind defaults for UIKit theme */
+.bg-primary { 
+  background-color: var(--fern-green) !important; 
+}
+.bg-primary-dark { 
+  background-color: var(--fern-green-dark) !important; 
+}
+.bg-accent { 
+  background-color: var(--fern-accent) !important; 
+}
+.text-primary { 
+  color: var(--fern-green) !important; 
+}
+.text-primary-dark { 
+  color: var(--fern-green-dark) !important; 
+}
+.border-primary { 
+  border-color: var(--fern-green) !important; 
+}
+
+/* Modal animations */
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-overlay {
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+  a:hover {
+    color: #747bff;
+  }
+  button {
+    background-color: #f9f9f9;
+  }
+}

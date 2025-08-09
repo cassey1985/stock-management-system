@@ -111,65 +111,77 @@ const FinancialLedger: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
+    // Fix floating point precision issues by rounding to 2 decimal places
+    const roundedAmount = Math.round(amount * 100) / 100;
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
-    }).format(amount);
+    }).format(roundedAmount);
   };
 
   // Calculate comprehensive financial metrics
   const calculateFinancialMetrics = () => {
-    const capital = transactions
-      .filter(t => {
-        const category = t.category.toLowerCase();
-        return category.includes('capital') || 
-               category.includes('investment') || 
-               category.includes('owner capital') ||
-               category.includes('equity');
-      })
-      .reduce((sum, t) => sum + t.creditAmount, 0);
-
-    const totalIncome = transactions
-      .filter(t => 
-        t.category.toLowerCase().includes('sales') || 
-        t.category.toLowerCase().includes('income') || 
-        t.category.toLowerCase().includes('revenue') ||
-        t.category.toLowerCase().includes('accounts receivable')
-      )
-      .reduce((sum, t) => sum + t.creditAmount, 0);
-
-    const totalExpenses = transactions
+    // Fix floating point precision by rounding all calculations
+    const roundToTwo = (num: number) => Math.round(num * 100) / 100;
+    
+    // Calculate total capital as: Total Credits - Total Expenses (proper accounting)
+    const totalCredits = roundToTwo(transactions.reduce((sum, t) => sum + t.creditAmount, 0));
+    const totalDebits = roundToTwo(transactions.reduce((sum, t) => sum + t.debitAmount, 0));
+    
+    // Total expenses should only be actual operating expenses
+    const totalExpenses = roundToTwo(transactions
       .filter(t => 
         t.debitAmount > 0 && 
+        t.type === 'expense' && // Only expense type transactions
         !t.category.toLowerCase().includes('assets') &&
+        !t.category.toLowerCase().includes('capital') &&
+        !t.category.toLowerCase().includes('accounts receivable')
+      )
+      .reduce((sum, t) => sum + t.debitAmount, 0));
+    
+    // Capital = Total Credits - Operating Expenses (Net Worth)
+    const capital = roundToTwo(totalCredits - totalExpenses);
+
+    // Only count actual sales/revenue as income, NOT receivables
+    const totalIncome = roundToTwo(transactions
+      .filter(t => 
+        (t.category.toLowerCase().includes('sales') || 
+         t.category.toLowerCase().includes('income') || 
+         t.category.toLowerCase().includes('revenue')) &&
+        !t.category.toLowerCase().includes('accounts receivable')
+      )
+      .reduce((sum, t) => sum + t.creditAmount, 0));
+
+    const payableExpenses = roundToTwo(transactions
+      .filter(t => t.category.toLowerCase().includes('accounts payable'))
+      .reduce((sum, t) => sum + t.debitAmount, 0));
+
+    const receivableIncome = roundToTwo(transactions
+      .filter(t => t.category.toLowerCase().includes('accounts receivable'))
+      .reduce((sum, t) => sum + t.creditAmount, 0));
+
+    const rentExpenses = roundToTwo(transactions
+      .filter(t => 
+        t.category.toLowerCase().includes('rent') && 
+        t.type === 'expense'
+      )
+      .reduce((sum, t) => sum + t.debitAmount, 0));
+
+    // Only count actual operational expenses, NOT opening stock or receivables
+    const operationalExpenses = roundToTwo(transactions
+      .filter(t => 
+        t.debitAmount > 0 && 
+        t.type === 'expense' && // Only expense type transactions
+        !t.category.toLowerCase().includes('rent') &&
+        !t.category.toLowerCase().includes('accounts payable') &&
+        !t.category.toLowerCase().includes('assets') &&
+        !t.category.toLowerCase().includes('accounts receivable') &&
         !t.category.toLowerCase().includes('capital')
       )
-      .reduce((sum, t) => sum + t.debitAmount, 0);
+      .reduce((sum, t) => sum + t.debitAmount, 0));
 
-    const payableExpenses = transactions
-      .filter(t => t.category.toLowerCase().includes('accounts payable'))
-      .reduce((sum, t) => sum + t.debitAmount, 0);
-
-    const receivableIncome = transactions
-      .filter(t => t.category.toLowerCase().includes('accounts receivable'))
-      .reduce((sum, t) => sum + t.creditAmount, 0);
-
-    const rentExpenses = transactions
-      .filter(t => t.category.toLowerCase().includes('rent'))
-      .reduce((sum, t) => sum + t.debitAmount, 0);
-
-    const operationalExpenses = transactions
-      .filter(t => 
-        t.debitAmount > 0 && 
-        !t.category.toLowerCase().includes('rent') &&
-        !t.category.toLowerCase().includes('accounts payable')
-      )
-      .reduce((sum, t) => sum + t.debitAmount, 0);
-
-    const totalCredits = transactions.reduce((sum, t) => sum + t.creditAmount, 0);
-    const totalDebits = transactions.reduce((sum, t) => sum + t.debitAmount, 0);
-    const netPosition = totalCredits - totalDebits;
-    const profitLoss = totalIncome - totalExpenses;
+    const netPosition = roundToTwo(totalCredits - totalDebits);
+    const profitLoss = roundToTwo(totalIncome - totalExpenses);
 
     return {
       capital,
@@ -218,9 +230,11 @@ const FinancialLedger: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">Financial Ledger</h1>
-        <Button onClick={() => setShowAddTransaction(true)} variant="primary">
-          Add Transaction
-        </Button>
+        <div className="flex gap-3">
+          <Button onClick={() => setShowAddTransaction(true)} variant="primary">
+            Add Transaction
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -482,6 +496,7 @@ const FinancialLedger: React.FC = () => {
             <thead>
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-2 font-medium text-gray-700">Date</th>
+                <th className="text-left py-3 px-2 font-medium text-gray-700">Type</th>
                 <th className="text-left py-3 px-2 font-medium text-gray-700">Category</th>
                 <th className="text-left py-3 px-2 font-medium text-gray-700">Description</th>
                 <th className="text-right py-3 px-2 font-medium text-gray-700">Debit (PHP)</th>
@@ -495,6 +510,20 @@ const FinancialLedger: React.FC = () => {
                 <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-2 text-sm text-gray-900">
                     {new Date(transaction.date).toLocaleDateString()}
+                  </td>
+                  <td className="py-3 px-2 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      transaction.type === 'stock_in' ? 'bg-blue-100 text-blue-800' :
+                      transaction.type === 'stock_out' ? 'bg-green-100 text-green-800' :
+                      transaction.type === 'payment_received' ? 'bg-purple-100 text-purple-800' :
+                      transaction.type === 'payment_made' ? 'bg-orange-100 text-orange-800' :
+                      transaction.type === 'opening_stock' ? 'bg-indigo-100 text-indigo-800' :
+                      transaction.type === 'opening_balance' ? 'bg-yellow-100 text-yellow-800' :
+                      transaction.type === 'debt_created' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {transaction.type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </span>
                   </td>
                   <td className="py-3 px-2 text-sm">
                     <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded-full text-xs">
@@ -525,7 +554,7 @@ const FinancialLedger: React.FC = () => {
               ))}
               {filteredTransactions.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-gray-500">
+                  <td colSpan={8} className="py-8 text-center text-gray-500">
                     No transactions found matching your filters.
                   </td>
                 </tr>

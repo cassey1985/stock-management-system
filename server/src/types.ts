@@ -145,7 +145,7 @@ export interface GeneralDebtPayment {
 export interface Transaction {
   id: string;
   date: Date;
-  type: 'stock_in' | 'stock_out' | 'opening_stock' | 'payment_received' | 'payment_made' | 'debt_created' | 'expense' | 'adjustment';
+  type: 'stock_in' | 'stock_out' | 'opening_stock' | 'opening_balance' | 'payment_received' | 'payment_made' | 'debt_created' | 'expense' | 'adjustment';
   category: string;
   description: string;
   reference?: string; // References to original entry (stock in/out, payment, etc.)

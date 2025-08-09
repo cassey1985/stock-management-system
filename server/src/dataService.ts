@@ -54,6 +54,31 @@ class DataService {
   // Initialize the data service
   async initialize(): Promise<void> {
     await this.loadData();
+    this.fixDateMismatches(); // Fix any date mismatches on startup
+  }
+
+  // Quick fix for date mismatches between debts and transactions
+  private fixDateMismatches(): void {
+    console.log('🔧 Fixing date mismatches between debts and transactions...');
+    let fixCount = 0;
+
+    this.generalDebts.forEach(debt => {
+      const relatedTransactions = this.transactions.filter(t => t.reference === debt.id);
+      relatedTransactions.forEach(transaction => {
+        if (transaction.date.getTime() !== debt.issueDate.getTime()) {
+          console.log(`📅 Fixing date mismatch for debt ${debt.id}: ${transaction.date.toISOString().split('T')[0]} -> ${debt.issueDate.toISOString().split('T')[0]}`);
+          transaction.date = debt.issueDate;
+          fixCount++;
+        }
+      });
+    });
+
+    if (fixCount > 0) {
+      console.log(`✅ Fixed ${fixCount} date mismatches`);
+      this.persistData();
+    } else {
+      console.log('✅ No date mismatches found');
+    }
   }
 
   // FIFO Implementation - Core logic from VBA
@@ -222,6 +247,31 @@ class DataService {
     return this.stockInEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
+  updateStockInEntry(id: string, updates: Partial<Omit<StockInEntry, 'id' | 'createdAt'>>): StockInEntry {
+    const index = this.stockInEntries.findIndex(entry => entry.id === id);
+    if (index === -1) {
+      throw new Error(`Stock in entry with id ${id} not found`);
+    }
+
+    const entry = this.stockInEntries[index];
+    
+    // Handle date conversion if needed
+    if (updates.date && typeof updates.date === 'string') {
+      updates.date = new Date(updates.date);
+    }
+    if (updates.expiryDate && typeof updates.expiryDate === 'string') {
+      updates.expiryDate = new Date(updates.expiryDate);
+    }
+
+    // Update the entry
+    Object.assign(entry, updates, {
+      updatedAt: new Date()
+    });
+
+    this.persistData();
+    return entry;
+  }
+
   deleteStockInEntry(id: string): void {
     const index = this.stockInEntries.findIndex(entry => entry.id === id);
     if (index !== -1) {
@@ -280,6 +330,50 @@ class DataService {
     return this.stockOutEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
 
+  updateStockOutEntry(id: string, updates: Partial<Omit<StockOutEntry, 'id' | 'createdAt'>>): StockOutEntry {
+    const index = this.stockOutEntries.findIndex(entry => entry.id === id);
+    if (index === -1) {
+      throw new Error(`Stock out entry with id ${id} not found`);
+    }
+
+    const entry = this.stockOutEntries[index];
+    
+    // Handle date conversion if needed
+    if (updates.date && typeof updates.date === 'string') {
+      updates.date = new Date(updates.date);
+    }
+
+    // Recalculate totals if quantity or prices changed
+    if (updates.quantity || updates.sellingPrice) {
+      const quantity = updates.quantity || entry.quantity;
+      const sellingPrice = updates.sellingPrice || entry.sellingPrice;
+      const totalSale = quantity * sellingPrice;
+      
+      // Note: For simplicity, we're not recalculating FIFO costs here
+      // In a production system, you might want to recalculate based on current inventory
+      updates.totalSale = totalSale;
+      updates.profit = totalSale - (entry.totalCost || 0);
+      
+      // Update payment status based on amount paid
+      const amountPaid = updates.amountPaid !== undefined ? updates.amountPaid : entry.amountPaid;
+      if (amountPaid >= totalSale) {
+        updates.paymentStatus = 'paid';
+      } else if (amountPaid > 0) {
+        updates.paymentStatus = 'partial';
+      } else {
+        updates.paymentStatus = 'unpaid';
+      }
+    }
+
+    // Update the entry
+    Object.assign(entry, updates, {
+      updatedAt: new Date()
+    });
+
+    this.persistData();
+    return entry;
+  }
+
   deleteStockOutEntry(id: string): void {
     const index = this.stockOutEntries.findIndex(entry => entry.id === id);
     if (index !== -1) {
@@ -333,6 +427,43 @@ class DataService {
       this.customerDebts.splice(index, 1);
       this.persistData(); // Save after deleting customer debt
     }
+  }
+
+  deleteCustomer(customerName: string): void {
+    console.log(`Deleting customer: ${customerName}`);
+    
+    // Delete all customer debts
+    this.customerDebts = this.customerDebts.filter(debt => 
+      debt.customerName !== customerName
+    );
+    
+    // Delete all customer payments
+    this.payments = this.payments.filter(payment => 
+      payment.customerName !== customerName
+    );
+    
+    // Delete all stock out entries (sales) for this customer
+    this.stockOutEntries = this.stockOutEntries.filter(sale => 
+      sale.customerName !== customerName
+    );
+    
+    // Delete all general debts for this customer
+    this.generalDebts = this.generalDebts.filter(debt => 
+      debt.creditorName !== customerName
+    );
+    
+    // Delete all general debt payments for this customer
+    this.generalDebtPayments = this.generalDebtPayments.filter(payment => 
+      !this.generalDebts.find(debt => debt.id === payment.debtId && debt.creditorName === customerName)
+    );
+    
+    // Delete all transactions related to this customer
+    this.transactions = this.transactions.filter(transaction => 
+      !transaction.description.toLowerCase().includes(customerName.toLowerCase())
+    );
+    
+    console.log(`Customer ${customerName} and all related data deleted`);
+    this.persistData(); // Save after deleting customer and all related data
   }
 
   getDebtsByCustomer(customerName: string): CustomerDebt[] {
@@ -547,29 +678,73 @@ class DataService {
     };
     this.generalDebts.push(debt);
 
-    // Add transaction record based on debt type
+    // For opening balance detection, we'll use a flexible approach:
+    // If the debt has very old dates (more than 1 year ago), treat as opening balance
+    // This can be adjusted based on when you started using the system
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1); // 1 year ago as default
+    const isOpeningBalance = debt.issueDate <= cutoffDate;
+
+    // Add transaction record based on debt type and whether it's opening balance
     if (debt.type === 'payable') {
-      // We owe money - this is a liability (credit)
-      this.addTransaction({
-        type: 'debt_created',
-        category: `Accounts Payable - ${debt.category}`,
-        description: `Debt created: ${debt.description} (${debt.creditorName})`,
-        reference: debt.id,
-        debitAmount: debt.originalAmount, // Expense or asset
-        creditAmount: 0,
-        date: debt.issueDate
-      });
+      if (isOpeningBalance) {
+        // Opening balance payable - this represents initial liabilities
+        this.addTransaction({
+          type: 'opening_balance' as const,
+          category: `Opening Liabilities - ${debt.category}`,
+          description: `Opening Balance: ${debt.description} (${debt.creditorName})`,
+          reference: debt.id,
+          debitAmount: 0,
+          creditAmount: debt.originalAmount, // Liability (credit)
+          date: debt.issueDate
+        });
+      } else {
+        // Regular payable - we owe money - this is a liability (credit)
+        this.addTransaction({
+          type: 'debt_created',
+          category: `Accounts Payable - ${debt.category}`,
+          description: `Debt created: ${debt.description} (${debt.creditorName})`,
+          reference: debt.id,
+          debitAmount: debt.originalAmount, // Expense or asset
+          creditAmount: 0,
+          date: debt.issueDate
+        });
+      }
     } else {
-      // Someone owes us - this is an asset (debit)
-      this.addTransaction({
-        type: 'debt_created',
-        category: `Accounts Receivable - ${debt.category}`,
-        description: `Receivable created: ${debt.description} (${debt.creditorName})`,
-        reference: debt.id,
-        debitAmount: 0,
-        creditAmount: debt.originalAmount, // Income or receivable
-        date: debt.issueDate
-      });
+      if (isOpeningBalance) {
+        // Opening balance receivable - this represents initial assets
+        this.addTransaction({
+          type: 'opening_balance' as const,
+          category: `Opening Assets - Accounts Receivable`,
+          description: `Opening Balance: ${debt.description} (${debt.creditorName})`,
+          reference: debt.id,
+          debitAmount: debt.originalAmount, // Asset (debit)
+          creditAmount: 0,
+          date: debt.issueDate
+        });
+        
+        // Record the corresponding capital entry
+        this.addTransaction({
+          type: 'opening_balance' as const,
+          category: 'Owner Capital - Opening Receivables',
+          description: `Capital Investment: Opening Receivable - ${debt.description}`,
+          reference: debt.id,
+          debitAmount: 0,
+          creditAmount: debt.originalAmount, // Capital increase
+          date: debt.issueDate
+        });
+      } else {
+        // Regular receivable - someone owes us - this is an asset (debit)
+        this.addTransaction({
+          type: 'debt_created',
+          category: `Accounts Receivable - ${debt.category}`,
+          description: `Receivable created: ${debt.description} (${debt.creditorName})`,
+          reference: debt.id,
+          debitAmount: 0,
+          creditAmount: debt.originalAmount, // Income or receivable
+          date: debt.issueDate
+        });
+      }
     }
 
     this.persistData(); // Save after adding general debt
@@ -592,8 +767,171 @@ class DataService {
       throw new Error('General debt not found');
     }
 
+    console.log('🔄 Updating debt:', {
+      id: debt.id,
+      currentAmount: debt.originalAmount,
+      newAmount: updates.originalAmount,
+      currentBalance: debt.remainingBalance,
+      updates: updates
+    });
+
+    // Handle date conversions if needed
+    if (updates.issueDate && typeof updates.issueDate === 'string') {
+      updates.issueDate = new Date(updates.issueDate);
+    }
+    if (updates.dueDate && typeof updates.dueDate === 'string') {
+      updates.dueDate = new Date(updates.dueDate);
+    }
+
+    // If originalAmount is being updated, recalculate remainingBalance
+    if (updates.originalAmount !== undefined) {
+      const newOriginalAmount = updates.originalAmount;
+      const currentPaidAmount = debt.paidAmount;
+      
+      // Recalculate remaining balance
+      updates.remainingBalance = newOriginalAmount - currentPaidAmount;
+      
+      // Update status based on new balance
+      updates.status = updates.remainingBalance <= 0 ? 'paid' : 'active';
+      
+      console.log('💰 Recalculated balance:', {
+        newOriginalAmount,
+        currentPaidAmount,
+        newRemainingBalance: updates.remainingBalance,
+        newStatus: updates.status
+      });
+    }
+
+    // Find and update ALL transactions related to this debt (there might be multiple for opening balance items)
+    const relatedTransactions = this.transactions.filter(t => t.reference === debt.id);
+    console.log('🔍 Found related transactions:', relatedTransactions.length);
+    
+    if (relatedTransactions.length > 0) {
+      relatedTransactions.forEach((transaction, index) => {
+        console.log(`📊 Updating transaction ${index + 1}:`, {
+          id: transaction.id,
+          type: transaction.type,
+          category: transaction.category,
+          currentAmount: { debit: transaction.debitAmount, credit: transaction.creditAmount },
+          currentDate: transaction.date
+        });
+        
+        // Update transaction details based on what changed in the debt
+        if (updates.issueDate) {
+          transaction.date = updates.issueDate;
+          console.log('📅 Updated transaction date to:', updates.issueDate);
+        }
+        
+        if (updates.originalAmount !== undefined) {
+          // Determine if this is an opening balance
+          const cutoffDate = new Date();
+          cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+          const isOpeningBalance = (updates.issueDate || debt.issueDate) <= cutoffDate;
+          
+          console.log('🏛️ Opening balance check:', {
+            isOpeningBalance,
+            transactionType: transaction.type,
+            debtType: debt.type,
+            category: transaction.category
+          });
+          
+          // Update transaction amounts based on transaction type and debt type
+          if (transaction.type === 'opening_balance') {
+            if (debt.type === 'payable') {
+              if (transaction.category.includes('Opening Liabilities')) {
+                transaction.creditAmount = updates.originalAmount; // Opening liability
+                transaction.debitAmount = 0;
+              }
+            } else { // receivable
+              if (transaction.category.includes('Opening Assets') || transaction.category.includes('Accounts Receivable')) {
+                // This is the receivable asset transaction
+                transaction.debitAmount = updates.originalAmount; // Opening asset
+                transaction.creditAmount = 0;
+              } else if (transaction.category.includes('Owner Capital')) {
+                // This is the corresponding capital transaction
+                transaction.creditAmount = updates.originalAmount; // Capital increase
+                transaction.debitAmount = 0;
+              }
+            }
+          } else if (transaction.type === 'debt_created') {
+            if (debt.type === 'payable') {
+              transaction.debitAmount = updates.originalAmount; // Regular expense
+              transaction.creditAmount = 0;
+            } else { // receivable
+              transaction.debitAmount = 0;
+              transaction.creditAmount = updates.originalAmount; // Regular income
+            }
+          }
+          
+          console.log('💱 Updated transaction amounts:', {
+            newDebit: transaction.debitAmount,
+            newCredit: transaction.creditAmount
+          });
+        }
+        
+        if (updates.description || updates.creditorName) {
+          // Update transaction description
+          const creditorName = updates.creditorName || debt.creditorName;
+          const description = updates.description || debt.description;
+          const cutoffDate = new Date();
+          cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+          const isOpeningBalance = (updates.issueDate || debt.issueDate) <= cutoffDate;
+          
+          if (transaction.type === 'opening_balance') {
+            if (transaction.category.includes('Opening Liabilities') || transaction.category.includes('Opening Assets') || transaction.category.includes('Accounts Receivable')) {
+              transaction.description = `Opening Balance: ${description} (${creditorName})`;
+            } else if (transaction.category.includes('Owner Capital')) {
+              transaction.description = `Capital Investment: Opening Receivable - ${description}`;
+            }
+          } else if (transaction.type === 'debt_created') {
+            if (debt.type === 'payable') {
+              transaction.description = `Debt created: ${description} (${creditorName})`;
+            } else {
+              transaction.description = `Receivable created: ${description} (${creditorName})`;
+            }
+          }
+          
+          console.log('📝 Updated transaction description:', transaction.description);
+        }
+        
+        if (updates.category) {
+          // Update transaction category
+          const cutoffDate = new Date();
+          cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+          const isOpeningBalance = (updates.issueDate || debt.issueDate) <= cutoffDate;
+          
+          if (transaction.type === 'opening_balance') {
+            if (debt.type === 'payable' && transaction.category.includes('Opening Liabilities')) {
+              transaction.category = `Opening Liabilities - ${updates.category}`;
+            }
+            // Don't change capital or receivable opening balance categories as they're structured differently
+          } else if (transaction.type === 'debt_created') {
+            if (debt.type === 'payable') {
+              transaction.category = `Accounts Payable - ${updates.category}`;
+            } else {
+              transaction.category = `Accounts Receivable - ${updates.category}`;
+            }
+          }
+          
+          console.log('🏷️ Updated transaction category:', transaction.category);
+        }
+      });
+    }
+
     Object.assign(debt, updates, { updatedAt: new Date() });
+    console.log('✅ Debt update completed:', {
+      id: debt.id,
+      finalAmount: debt.originalAmount,
+      finalBalance: debt.remainingBalance,
+      finalStatus: debt.status
+    });
+    
+    this.persistData(); // Save after updating general debt and transactions
     return debt;
+  }
+
+  getGeneralDebtById(id: string): GeneralDebt | null {
+    return this.generalDebts.find(d => d.id === id) || null;
   }
 
   deleteGeneralDebt(id: string): void {
@@ -829,38 +1167,38 @@ class DataService {
         notes: 'Monthly installment for equipment loan',
         reference: 'LOAN-2025-08'
       },
-      // Receivables (Money others owe us)
+      // Receivables (Money others owe us) - Opening Balance Items
       {
         type: 'receivable' as const,
         category: 'Personal Loan',
-        description: 'Personal loan to employee John',
+        description: 'Personal loan to employee John (Opening Balance)',
         creditorName: 'John Martinez',
         creditorContact: '(02) 987-6543',
         originalAmount: 5000.00,
         paidAmount: 1000.00,
         remainingBalance: 4000.00,
         dueDate: new Date('2025-12-31'),
-        issueDate: new Date('2025-06-01'),
+        issueDate: new Date('2024-05-15'), // Before business start date (opening balance)
         priority: 'low' as const,
         status: 'active' as const,
-        notes: 'Emergency personal loan, payable in installments',
-        reference: 'PLOAN-001'
+        notes: 'Opening balance - existing personal loan, payable in installments',
+        reference: 'OPENING-PLOAN-001'
       },
       {
         type: 'receivable' as const,
         category: 'Advance',
-        description: 'Cash advance to supplier for bulk order',
+        description: 'Cash advance to supplier for bulk order (Opening Balance)',
         creditorName: 'Premium Oils Trading',
         creditorContact: '(02) 555-0123',
         originalAmount: 3000.00,
         paidAmount: 0,
         remainingBalance: 3000.00,
         dueDate: new Date('2025-09-01'),
-        issueDate: new Date('2025-07-01'),
+        issueDate: new Date('2024-05-20'), // Before business start date (opening balance)
         priority: 'medium' as const,
         status: 'active' as const,
-        notes: 'Advance payment for premium oil delivery',
-        reference: 'ADV-2025-001'
+        notes: 'Opening balance - advance payment for premium oil delivery',
+        reference: 'OPENING-ADV-001'
       }
     ];
 
@@ -938,11 +1276,27 @@ class DataService {
   }
 
   // Get opening capital information
-  getOpeningCapital(): { totalOpeningStock: number; openingStockEntries: any[] } {
+  getOpeningCapital(): { totalOpeningStock: number; openingStockEntries: any[]; totalOpeningReceivables: number; openingReceivables: any[]; totalOpeningCapital: number } {
+    // For opening balance detection, we'll use a flexible approach:
+    // Consider receivables older than 1 year as opening balances
+    const cutoffDate = new Date();
+    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
+    
+    // Opening stock entries
     const openingStockEntries = this.stockInEntries.filter(entry => entry.entryType === 'opening_stock');
     const totalOpeningStock = openingStockEntries.reduce((total, entry) => {
       return total + (entry.quantity * entry.purchasePrice);
     }, 0);
+
+    // Opening receivables (old receivables that existed before regular business operations)
+    const openingReceivables = this.generalDebts.filter(debt => 
+      debt.type === 'receivable' && debt.issueDate <= cutoffDate
+    );
+    const totalOpeningReceivables = openingReceivables.reduce((total, debt) => {
+      return total + debt.originalAmount;
+    }, 0);
+
+    const totalOpeningCapital = totalOpeningStock + totalOpeningReceivables;
 
     return {
       totalOpeningStock,
@@ -954,7 +1308,21 @@ class DataService {
         purchasePrice: entry.purchasePrice,
         totalValue: entry.quantity * entry.purchasePrice,
         notes: entry.notes
-      }))
+      })),
+      totalOpeningReceivables,
+      openingReceivables: openingReceivables.map(debt => ({
+        id: debt.id,
+        issueDate: debt.issueDate,
+        creditorName: debt.creditorName,
+        description: debt.description,
+        category: debt.category,
+        originalAmount: debt.originalAmount,
+        paidAmount: debt.paidAmount,
+        remainingBalance: debt.remainingBalance,
+        notes: debt.notes,
+        reference: debt.reference
+      })),
+      totalOpeningCapital
     };
   }
 
@@ -1070,6 +1438,278 @@ class DataService {
     return true;
   }
 
+  // Customer Synchronization Methods
+  getCustomerProfile(customerName: string): {
+    customerName: string;
+    totalPurchases: number;
+    totalSales: number;
+    totalPaid: number;
+    totalDebt: number;
+    customerDebts: CustomerDebt[];
+    generalDebts: GeneralDebt[];
+    salesHistory: StockOutEntry[];
+    paymentHistory: (Payment | GeneralDebtPayment)[];
+    allTransactions: any[];
+  } {
+    try {
+      const normalizedName = customerName.toLowerCase().trim();
+      
+      // Get sales history for this customer
+      const salesHistory = this.stockOutEntries.filter(sale => 
+        sale.customerName && sale.customerName.toLowerCase().includes(normalizedName)
+      );
+
+      // Get customer debts (from sales)
+      const customerDebts = this.customerDebts.filter(debt => 
+        debt.customerName && debt.customerName.toLowerCase().includes(normalizedName)
+      );
+
+      // Get general debts for this customer (both receivables and payables)
+      const generalDebts = this.generalDebts.filter(debt => 
+        debt.creditorName && debt.creditorName.toLowerCase().includes(normalizedName)
+      );
+
+      // Get payment history from both sources
+      const customerPayments = this.payments.filter(payment => 
+        payment.customerName && payment.customerName.toLowerCase().includes(normalizedName)
+      );
+
+      const generalPayments = this.generalDebtPayments.filter(payment => {
+        const debt = this.generalDebts.find(d => d.id === payment.debtId);
+        return debt && debt.creditorName && debt.creditorName.toLowerCase().includes(normalizedName);
+      });
+
+      // Calculate totals
+      const totalSales = salesHistory.reduce((sum, sale) => sum + sale.totalSale, 0);
+      const totalPurchases = salesHistory.reduce((sum, sale) => sum + sale.quantity, 0);
+      
+      const customerDebtTotal = customerDebts.reduce((sum, debt) => sum + debt.remainingBalance, 0);
+      const generalDebtTotal = generalDebts.reduce((sum, debt) => {
+        // For receivables, they owe us (positive debt)
+        // For payables, we owe them (negative debt)
+        return sum + (debt.type === 'receivable' ? debt.remainingBalance : -debt.remainingBalance);
+      }, 0);
+      
+      const totalDebt = customerDebtTotal + generalDebtTotal;
+      
+      const customerPaymentTotal = customerPayments.reduce((sum, payment) => sum + payment.amount, 0);
+      const generalPaymentTotal = generalPayments.reduce((sum, payment) => sum + payment.amount, 0);
+      
+      // Include initial payments made during sales (amountPaid from sales)
+      const initialSalePayments = salesHistory.reduce((sum, sale) => sum + sale.amountPaid, 0);
+      
+      const totalPaid = customerPaymentTotal + generalPaymentTotal + initialSalePayments;
+
+      // Combine all transactions
+      const allTransactions = [
+        ...salesHistory.map(sale => ({
+          id: sale.id,
+          date: sale.date,
+          type: 'sale',
+          description: `Sale: ${sale.productName} (${sale.quantity} units)`,
+          amount: sale.totalSale,
+          status: sale.paymentStatus,
+          reference: sale.id
+        })),
+        ...customerPayments.map(payment => ({
+          id: payment.id,
+          date: payment.paymentDate,
+          type: 'customer_payment',
+          description: `Payment received`,
+          amount: payment.amount,
+          status: 'completed',
+          reference: payment.debtId
+        })),
+        ...generalDebts.map(debt => ({
+          id: debt.id,
+          date: debt.issueDate,
+          type: debt.type === 'receivable' ? 'general_receivable' : 'general_payable',
+          description: debt.description,
+          amount: debt.originalAmount,
+          status: debt.status,
+          reference: debt.id
+        })),
+        ...generalPayments.map(payment => ({
+          id: payment.id,
+          date: payment.paymentDate,
+          type: 'general_payment',
+          description: `Payment for general debt`,
+          amount: payment.amount,
+          status: 'completed',
+          reference: payment.debtId
+        }))
+      ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      return {
+        customerName,
+        totalPurchases,
+        totalSales,
+        totalPaid,
+        totalDebt,
+        customerDebts,
+        generalDebts,
+        salesHistory,
+        paymentHistory: [...customerPayments, ...generalPayments],
+        allTransactions
+      };
+    } catch (error) {
+      console.error('Error getting customer profile:', error);
+      throw error;
+    }
+  }
+
+  getAllCustomers(): Array<{
+    name: string;
+    totalSales: number;
+    totalDebt: number;
+    lastTransaction: Date | null;
+    status: 'active' | 'inactive';
+  }> {
+    try {
+      const customerMap = new Map();
+
+      // Process sales customers
+      this.stockOutEntries.forEach(sale => {
+        if (sale.customerName) {
+          const name = sale.customerName.trim();
+          if (!customerMap.has(name)) {
+            customerMap.set(name, {
+              name,
+              totalSales: 0,
+              totalDebt: 0,
+              lastTransaction: null,
+              transactions: []
+            });
+          }
+          const customer = customerMap.get(name);
+          customer.totalSales += sale.totalSale;
+          customer.transactions.push(sale.date);
+        }
+      });
+
+      // Add customer debts
+      this.customerDebts.forEach(debt => {
+        if (debt.customerName) {
+          const name = debt.customerName.trim();
+          if (!customerMap.has(name)) {
+            customerMap.set(name, {
+              name,
+              totalSales: 0,
+              totalDebt: 0,
+              lastTransaction: null,
+              transactions: []
+            });
+          }
+          const customer = customerMap.get(name);
+          customer.totalDebt += debt.remainingBalance;
+        }
+      });
+
+      // Add general debts customers
+      this.generalDebts.forEach(debt => {
+        if (debt.creditorName) {
+          const name = debt.creditorName.trim();
+          if (!customerMap.has(name)) {
+            customerMap.set(name, {
+              name,
+              totalSales: 0,
+              totalDebt: 0,
+              lastTransaction: null,
+              transactions: []
+            });
+          }
+          const customer = customerMap.get(name);
+          // Receivables are money they owe us, payables are money we owe them
+          customer.totalDebt += (debt.type === 'receivable' ? debt.remainingBalance : -debt.remainingBalance);
+          customer.transactions.push(debt.issueDate);
+        }
+      });
+
+      // Calculate last transaction and status
+      return Array.from(customerMap.values()).map(customer => {
+        const lastTransaction = customer.transactions.length > 0 
+          ? new Date(Math.max(...customer.transactions.map((d: Date) => d.getTime())))
+          : null;
+        
+        const daysSinceLastTransaction = lastTransaction 
+          ? (Date.now() - lastTransaction.getTime()) / (1000 * 60 * 60 * 24)
+          : Infinity;
+        
+        return {
+          name: customer.name,
+          totalSales: customer.totalSales,
+          totalDebt: customer.totalDebt,
+          lastTransaction,
+          status: (daysSinceLastTransaction <= 90 ? 'active' : 'inactive') as 'active' | 'inactive'
+        };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+    } catch (error) {
+      console.error('Error getting all customers:', error);
+      return [];
+    }
+  }
+
+  // Enhanced search for customers across all debt types
+  searchCustomers(searchTerm: string): Array<{
+    name: string;
+    type: 'sales_customer' | 'general_debtor' | 'both';
+    totalDebt: number;
+    lastActivity: Date;
+  }> {
+    try {
+      const term = searchTerm.toLowerCase().trim();
+      const results = new Map();
+
+      // Search in sales customers
+      this.customerDebts.forEach(debt => {
+        if (debt.customerName && debt.customerName.toLowerCase().includes(term)) {
+          const name = debt.customerName;
+          if (!results.has(name)) {
+            results.set(name, {
+              name,
+              type: 'sales_customer',
+              totalDebt: 0,
+              lastActivity: debt.updatedAt
+            });
+          }
+          const result = results.get(name);
+          result.totalDebt += debt.remainingBalance;
+          if (debt.updatedAt > result.lastActivity) {
+            result.lastActivity = debt.updatedAt;
+          }
+        }
+      });
+
+      // Search in general debtors
+      this.generalDebts.forEach(debt => {
+        if (debt.creditorName && debt.creditorName.toLowerCase().includes(term)) {
+          const name = debt.creditorName;
+          if (!results.has(name)) {
+            results.set(name, {
+              name,
+              type: 'general_debtor',
+              totalDebt: 0,
+              lastActivity: debt.updatedAt
+            });
+          } else {
+            const result = results.get(name);
+            result.type = 'both';
+          }
+          const result = results.get(name);
+          result.totalDebt += (debt.type === 'receivable' ? debt.remainingBalance : -debt.remainingBalance);
+          if (debt.updatedAt > result.lastActivity) {
+            result.lastActivity = debt.updatedAt;
+          }
+        }
+      });
+
+      return Array.from(results.values()).sort((a, b) => b.lastActivity.getTime() - a.lastActivity.getTime());
+    } catch (error) {
+      console.error('Error searching customers:', error);
+      return [];
+    }
+  }
+
   // Data Persistence Methods
   private async loadData(): Promise<void> {
     try {
@@ -1080,6 +1720,15 @@ class DataService {
       if (await fs.pathExists(DATA_FILE)) {
         console.log('Loading existing business data...');
         const data = await fs.readJson(DATA_FILE);
+        
+        // 🛡️ DATA PROTECTION: Check if this is real user data vs sample data
+        const hasRealData = this.detectRealUserData(data);
+        
+        if (hasRealData) {
+          console.log('🛡️ REAL USER DATA DETECTED - Loading your data safely...');
+        } else {
+          console.log('📝 Sample data detected - Safe to load...');
+        }
         
         // Restore data with date conversion
         this.products = data.products || [];
@@ -1158,6 +1807,52 @@ class DataService {
     }
   }
 
+  // 🛡️ DATA PROTECTION: Detect if data contains real user entries vs sample data
+  private detectRealUserData(data: any): boolean {
+    // Check for indicators of real user data
+    const indicators = [
+      // Non-sample product codes (not the default RICE001, OIL001, etc.)
+      () => data.products?.some((p: any) => 
+        !['RICE001', 'OIL001', 'SUGAR001', 'FLOUR001', 'TEA001'].includes(p.code)
+      ),
+      
+      // Non-sample customer names  
+      () => data.stockOutEntries?.some((s: any) => 
+        s.customerName && !['John Doe', 'Jane Smith', 'Bob Johnson', 'Alice Brown', 'Charlie Wilson'].includes(s.customerName)
+      ),
+      
+      // Non-sample general debt creditors
+      () => data.generalDebts?.some((d: any) => 
+        d.creditorName && ![
+          'Main Rice Supplier Ltd', 'City Electric Company', 'First National Bank', 
+          'John Martinez', 'Premium Oils Trading'
+        ].includes(d.creditorName)
+      ),
+      
+      // Custom opening balance references
+      () => data.generalDebts?.some((d: any) => 
+        d.reference && !d.reference.startsWith('OPENING-') && !d.reference.startsWith('PLOAN-') && 
+        !d.reference.startsWith('ADV-') && !d.reference.startsWith('INV-') && !d.reference.startsWith('ELEC-') && 
+        !d.reference.startsWith('LOAN-')
+      ),
+      
+      // User modifications (more than 2024-08-06, or non-default users)
+      () => data.users?.some((u: any) => 
+        !['admin', 'sales01', 'cashier01'].includes(u.username)
+      ),
+      
+      // Data created after sample date (after today)
+      () => {
+        const sampleDataCutoff = new Date('2024-08-06');
+        return data.stockInEntries?.some((s: any) => new Date(s.createdAt) > sampleDataCutoff) ||
+               data.stockOutEntries?.some((s: any) => new Date(s.createdAt) > sampleDataCutoff) ||
+               data.generalDebts?.some((d: any) => new Date(d.createdAt) > sampleDataCutoff);
+      }
+    ];
+
+    return indicators.some(check => check());
+  }
+
   private async saveData(): Promise<void> {
     try {
       await fs.ensureDir(DATA_DIR);
@@ -1185,6 +1880,23 @@ class DataService {
   // Call this method after any data modification
   private async persistData(): Promise<void> {
     await this.saveData();
+  }
+
+  // 🛡️ DATA PROTECTION: Create automatic backup before major changes
+  async createAutoBackup(reason: string = 'system_update'): Promise<void> {
+    try {
+      if (await fs.pathExists(DATA_FILE)) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        const backupDir = path.join(DATA_DIR, 'backups');
+        await fs.ensureDir(backupDir);
+        const backupFile = path.join(backupDir, `backup-${reason}-${timestamp}.json`);
+        
+        await fs.copy(DATA_FILE, backupFile);
+        console.log(`🛡️ Auto-backup created: ${backupFile}`);
+      }
+    } catch (error) {
+      console.error('❌ Failed to create backup:', error);
+    }
   }
 
   // Backup and restore methods for safe updates
@@ -1228,6 +1940,119 @@ class DataService {
       users: this.users.map(user => ({ ...user, password: '[REDACTED]' })) as any,
       lastUpdated: new Date().toISOString()
     };
+  }
+
+  // Fix data inconsistencies
+  async fixDebtCreatedToOpeningBalance(): Promise<{ fixed: number; message: string }> {
+    try {
+      // Create backup first
+      await this.createBackup();
+      
+      let fixedCount = 0;
+      
+      // Find all debt_created transactions and convert them to opening_balance
+      this.transactions = this.transactions.map(transaction => {
+        if (transaction.type === 'debt_created') {
+          fixedCount++;
+          return {
+            ...transaction,
+            type: 'opening_balance' as any
+          };
+        }
+        return transaction;
+      });
+      
+      // Save the fixed data
+      await this.saveData();
+      
+      const message = `Successfully converted ${fixedCount} debt_created transactions to opening_balance transactions.`;
+      console.log(`✅ ${message}`);
+      
+      return {
+        fixed: fixedCount,
+        message
+      };
+    } catch (error) {
+      console.error('❌ Error fixing debt_created transactions:', error);
+      throw error;
+    }
+  }
+
+  // Fix decimal precision issues in transactions
+  async fixDecimalPrecision() {
+    try {
+      // Read the raw JSON file directly
+      const rawData = await fs.readJSON(DATA_FILE);
+      
+      // Create backup
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupPath = path.join(DATA_DIR, `backup-decimal-fix-${timestamp}.json`);
+      await fs.writeJSON(backupPath, rawData, { spaces: 2 });
+      console.log(`✅ Backup created at: ${backupPath}`);
+      
+      let fixedCount = 0;
+      
+      // Fix decimal precision in transactions array
+      if (rawData.transactions && Array.isArray(rawData.transactions)) {
+        rawData.transactions = rawData.transactions.map((transaction: any) => {
+          let fixed = false;
+          
+          // Fix debitAmount
+          if (typeof transaction.debitAmount === 'number' && transaction.debitAmount % 1 !== 0) {
+            const original = transaction.debitAmount;
+            transaction.debitAmount = Math.round(transaction.debitAmount * 100) / 100;
+            if (original !== transaction.debitAmount) {
+              fixed = true;
+            }
+          }
+          
+          // Fix creditAmount
+          if (typeof transaction.creditAmount === 'number' && transaction.creditAmount % 1 !== 0) {
+            const original = transaction.creditAmount;
+            transaction.creditAmount = Math.round(transaction.creditAmount * 100) / 100;
+            if (original !== transaction.creditAmount) {
+              fixed = true;
+            }
+          }
+          
+          // Fix balance
+          if (typeof transaction.balance === 'number' && transaction.balance % 1 !== 0) {
+            const original = transaction.balance;
+            transaction.balance = Math.round(transaction.balance * 100) / 100;
+            if (original !== transaction.balance) {
+              fixed = true;
+            }
+          }
+          
+          if (fixed) {
+            fixedCount++;
+            console.log(`Fixed transaction: ${transaction.description || 'Unknown'} (ID: ${transaction.id})`);
+          }
+          
+          return transaction;
+        });
+      }
+      
+      // Update lastUpdated
+      rawData.lastUpdated = new Date().toISOString();
+      
+      // Write the fixed data back to file
+      await fs.writeJSON(DATA_FILE, rawData, { spaces: 2 });
+      
+      // Reload the data into memory
+      await this.loadData();
+      
+      const message = `Successfully fixed decimal precision issues in ${fixedCount} transactions.`;
+      console.log(`✅ ${message}`);
+      
+      return {
+        fixed: fixedCount,
+        message
+      };
+    } catch (error) {
+      console.error('❌ Error fixing decimal precision:', error);
+      throw new Error(`Failed to fix decimal precision: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }
 

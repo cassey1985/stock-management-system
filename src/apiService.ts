@@ -12,7 +12,10 @@ import type {
   FIFOResult,
   User,
   LoginRequest,
-  LoginResponse
+  LoginResponse,
+  Customer,
+  CustomerSearchResult,
+  CustomerProfile
 } from './types';
 
 // API Configuration - works for both development and production
@@ -153,6 +156,13 @@ class ApiService {
     });
   }
 
+  async updateStockInEntry(id: string, entry: Partial<Omit<StockInEntry, 'id' | 'createdAt'>>): Promise<StockInEntry> {
+    return this.request<StockInEntry>(`/stock-in/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(entry),
+    });
+  }
+
   async deleteStockInEntry(id: string): Promise<void> {
     await this.request<void>(`/stock-in/${id}`, {
       method: 'DELETE',
@@ -167,6 +177,13 @@ class ApiService {
   async createStockOutEntry(entry: Omit<StockOutEntry, 'id' | 'totalCost' | 'totalSale' | 'profit' | 'paymentStatus' | 'createdAt' | 'updatedAt'>): Promise<StockOutEntry> {
     return this.request<StockOutEntry>('/stock-out', {
       method: 'POST',
+      body: JSON.stringify(entry),
+    });
+  }
+
+  async updateStockOutEntry(id: string, entry: Partial<Omit<StockOutEntry, 'id' | 'createdAt'>>): Promise<StockOutEntry> {
+    return this.request<StockOutEntry>(`/stock-out/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(entry),
     });
   }
@@ -290,6 +307,55 @@ class ApiService {
   async deleteGeneralDebtPayment(id: string): Promise<void> {
     await this.request<void>(`/general-debt-payments/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  // Customer Management
+  async getCustomers(): Promise<Customer[]> {
+    return this.request<Customer[]>('/customers');
+  }
+
+  async searchCustomers(term: string): Promise<CustomerSearchResult[]> {
+    return this.request<CustomerSearchResult[]>(`/customers/search?term=${encodeURIComponent(term)}`);
+  }
+
+  async getCustomerProfile(customerName: string): Promise<CustomerProfile> {
+    return this.request<CustomerProfile>(`/customers/${encodeURIComponent(customerName)}/profile`);
+  }
+
+  async deleteCustomer(customerName: string): Promise<void> {
+    await this.request<void>(`/customers/${encodeURIComponent(customerName)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Enhanced General Debts
+  async getGeneralDebtById(id: string): Promise<GeneralDebt> {
+    return this.request<GeneralDebt>(`/general-debts/${id}`);
+  }
+
+  // Opening Capital
+  async getOpeningCapital(): Promise<OpeningCapital> {
+    return this.request<OpeningCapital>('/opening-capital');
+  }
+
+  // Emergency fix for date mismatches
+  async fixDateMismatches(): Promise<{ success: boolean; fixedCount: number; message: string }> {
+    return this.request<{ success: boolean; fixedCount: number; message: string }>('/fix-dates', {
+      method: 'POST',
+    });
+  }
+
+  // Fix debt_created transactions to opening_balance
+  async fixDebtTypes(): Promise<{ success: boolean; fixedCount: number; message: string }> {
+    return this.request<{ success: boolean; fixedCount: number; message: string }>('/fix-debt-types', {
+      method: 'POST',
+    });
+  }
+
+  async fixDecimalPrecision(): Promise<{ success: boolean; fixedCount: number; message: string }> {
+    return this.request<{ success: boolean; fixedCount: number; message: string }>('/fix-decimal-precision', {
+      method: 'POST',
     });
   }
 }

@@ -27,6 +27,34 @@ app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+app.post('/api/stock-in', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const entry = dataService.addStockIn(req.body);
+    res.status(201).json(entry);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create stock in entry' });
+  }
+});
+
+app.put('/api/stock-in/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedEntry = dataService.updateStockInEntry(id, req.body);
+    res.json(updatedEntry);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update stock in entry' });
+  }
+});
+
+app.post('/api/stock-out', authenticateToken, requireSalesOrAdmin, (req, res) => {
+  try {
+    const entry = dataService.addStockOut(req.body);
+    res.status(201).json(entry);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to create stock out entry' });
+  }
+});
+
 // Serve a simple frontend at root
 app.get('/', (req, res) => {
   res.send(`
@@ -454,6 +482,20 @@ app.get('/api/dashboard', authenticateToken, (req, res) => {
   }
 });
 
+// Opening Capital Information (Admin only)
+app.get('/api/opening-capital', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const openingCapital = dataService.getOpeningCapital();
+    res.json(openingCapital);
+  } catch (error) {
+    console.error('Opening capital error:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch opening capital data',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 // Products (Admin only for add/edit/delete, Sales can view)
 app.get('/api/products', authenticateToken, (req, res) => {
   try {
@@ -555,6 +597,16 @@ app.post('/api/stock-out', authenticateToken, requireSalesOrAdmin, (req, res) =>
     res.status(201).json(entry);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create stock out entry' });
+  }
+});
+
+app.put('/api/stock-out/:id', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedEntry = dataService.updateStockOutEntry(id, req.body);
+    res.json(updatedEntry);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update stock out entry' });
   }
 });
 
@@ -722,16 +774,6 @@ app.post('/api/general-debts', (req, res) => {
   }
 });
 
-app.put('/api/general-debts/:id', (req, res) => {
-  try {
-    const { id } = req.params;
-    const debt = dataService.updateGeneralDebt(id, req.body);
-    res.json(debt);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to update general debt' });
-  }
-});
-
 app.delete('/api/general-debts/:id', (req, res) => {
   try {
     const { id } = req.params;
@@ -795,6 +837,150 @@ app.get('/api/admin/export', authenticateToken, requireAdmin, async (req, res) =
   } catch (error) {
     console.error('Data export failed:', error);
     res.status(500).json({ error: 'Failed to export data' });
+  }
+});
+
+// Customer Management Routes
+app.get('/api/customers', (req, res) => {
+  try {
+    const customers = dataService.getAllCustomers();
+    res.json(customers);
+  } catch (error) {
+    console.error('Failed to fetch customers:', error);
+    res.status(500).json({ error: 'Failed to fetch customers' });
+  }
+});
+
+app.get('/api/customers/search', (req, res) => {
+  try {
+    const { term } = req.query;
+    if (!term) {
+      return res.status(400).json({ error: 'Search term is required' });
+    }
+    const results = dataService.searchCustomers(term as string);
+    res.json(results);
+  } catch (error) {
+    console.error('Customer search failed:', error);
+    res.status(500).json({ error: 'Customer search failed' });
+  }
+});
+
+app.get('/api/customers/:customerName/profile', (req, res) => {
+  try {
+    const { customerName } = req.params;
+    const profile = dataService.getCustomerProfile(decodeURIComponent(customerName));
+    res.json(profile);
+  } catch (error) {
+    console.error('Failed to fetch customer profile:', error);
+    res.status(500).json({ error: 'Failed to fetch customer profile' });
+  }
+});
+
+app.delete('/api/customers/:customerName', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const { customerName } = req.params;
+    const decodedCustomerName = decodeURIComponent(customerName);
+    dataService.deleteCustomer(decodedCustomerName);
+    res.json({ success: true, message: `Customer "${decodedCustomerName}" and all related data deleted successfully` });
+  } catch (error) {
+    console.error('Failed to delete customer:', error);
+    res.status(500).json({ error: 'Failed to delete customer' });
+  }
+});
+
+// Enhanced General Debts Routes
+app.get('/api/general-debts/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const debt = dataService.getGeneralDebtById(id);
+    if (!debt) {
+      return res.status(404).json({ error: 'General debt not found' });
+    }
+    res.json(debt);
+  } catch (error) {
+    console.error('Failed to fetch general debt:', error);
+    res.status(500).json({ error: 'Failed to fetch general debt' });
+  }
+});
+
+app.put('/api/general-debts/:id', authenticateToken, (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    console.log('🎯 PUT request received for debt:', { id, updates });
+    const updatedDebt = dataService.updateGeneralDebt(id, updates);
+    console.log('✅ Successfully updated debt:', updatedDebt.id);
+    res.json(updatedDebt);
+  } catch (error) {
+    console.error('❌ Failed to update general debt:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to update general debt' });
+  }
+});
+
+// Emergency fix endpoint for date mismatches
+app.post('/api/fix-dates', authenticateToken, (req, res) => {
+  try {
+    console.log('🔧 Manual date fix triggered by admin');
+    let fixCount = 0;
+
+    dataService.getGeneralDebts().forEach(debt => {
+      const relatedTransactions = dataService.getTransactions().filter(t => t.reference === debt.id);
+      relatedTransactions.forEach(transaction => {
+        if (transaction.date.getTime() !== debt.issueDate.getTime()) {
+          console.log(`📅 Fixing date mismatch for debt ${debt.id}: ${transaction.date.toISOString().split('T')[0]} -> ${debt.issueDate.toISOString().split('T')[0]}`);
+          // Update transaction date directly
+          const allTransactions = dataService.getTransactions();
+          const txnIndex = allTransactions.findIndex(t => t.id === transaction.id);
+          if (txnIndex !== -1) {
+            allTransactions[txnIndex].date = debt.issueDate;
+            fixCount++;
+          }
+        }
+      });
+    });
+
+    if (fixCount > 0) {
+      console.log(`✅ Fixed ${fixCount} date mismatches`);
+      res.json({ success: true, fixedCount: fixCount, message: `Fixed ${fixCount} date mismatches` });
+    } else {
+      console.log('✅ No date mismatches found');
+      res.json({ success: true, fixedCount: 0, message: 'No date mismatches found' });
+    }
+  } catch (error) {
+    console.error('❌ Error fixing dates:', error);
+    res.status(500).json({ error: 'Failed to fix date mismatches' });
+  }
+});
+
+// Fix debt_created transactions to opening_balance
+app.post('/api/fix-debt-types', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 Converting debt_created transactions to opening_balance...');
+    const result = await dataService.fixDebtCreatedToOpeningBalance();
+    res.json({ 
+      success: true, 
+      fixedCount: result.fixed, 
+      message: result.message 
+    });
+  } catch (error) {
+    console.error('❌ Error fixing debt types:', error);
+    res.status(500).json({ error: 'Failed to fix debt transaction types' });
+  }
+});
+
+// Fix decimal precision issues in transactions
+app.post('/api/fix-decimal-precision', authenticateToken, async (req, res) => {
+  try {
+    console.log('🔧 Fixing decimal precision issues in transactions...');
+    const result = await dataService.fixDecimalPrecision();
+    res.json({ 
+      success: true, 
+      fixedCount: result.fixed, 
+      message: result.message 
+    });
+  } catch (error) {
+    console.error('❌ Error fixing decimal precision:', error);
+    res.status(500).json({ error: 'Failed to fix decimal precision issues' });
   }
 });
 

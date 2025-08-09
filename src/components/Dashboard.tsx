@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, StatCard, Badge, Button, LoadingSpinner, Alert } from './ui';
 import { apiService } from '../apiService';
-import type { DashboardStats } from '../types';
+import type { DashboardStats, OpeningCapital } from '../types';
 
 interface DashboardProps {
   onNavigate?: (page: string) => void;
@@ -9,6 +9,7 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [openingCapital, setOpeningCapital] = useState<OpeningCapital | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,8 +17,12 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const data = await apiService.getDashboardStats();
-        setStats(data);
+        const [dashboardData, openingCapitalData] = await Promise.all([
+          apiService.getDashboardStats(),
+          apiService.getOpeningCapital()
+        ]);
+        setStats(dashboardData);
+        setOpeningCapital(openingCapitalData);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
       } finally {
@@ -124,6 +129,84 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           subtitle="Money owed to us"
         />
       </div>
+
+      {/* Opening Capital Section */}
+      {openingCapital && (
+        <Card className="bg-gradient-to-r from-green-50 to-blue-50 border-green-200">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-bold mb-1 text-green-800">🏛️ Opening Capital & Assets</h3>
+              <p className="text-gray-600 text-sm">Your initial business investment and assets</p>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-green-800">
+                {formatCurrency(openingCapital.totalOpeningCapital)}
+              </div>
+              <p className="text-xs text-gray-500">Total Opening Capital</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Opening Stock */}
+            <div className="bg-white rounded-lg p-4 border border-green-200">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-green-700">📦 Opening Stock Inventory</h4>
+                <span className="text-lg font-bold text-green-800">
+                  {formatCurrency(openingCapital.totalOpeningStock)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">Initial inventory value at business start</p>
+              
+              {openingCapital.openingStockEntries.length > 0 && (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {openingCapital.openingStockEntries.map((entry) => (
+                    <div key={entry.id} className="flex justify-between text-xs bg-gray-50 p-2 rounded">
+                      <span className="font-medium">{entry.productName}</span>
+                      <span>{entry.quantity} × {formatCurrency(entry.purchasePrice)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Opening Receivables */}
+            <div className="bg-white rounded-lg p-4 border border-blue-200">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-semibold text-blue-700">💰 Opening Receivables</h4>
+                <span className="text-lg font-bold text-blue-800">
+                  {formatCurrency(openingCapital.totalOpeningReceivables)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600 mb-3">Money others owed you before business start</p>
+              
+              {openingCapital.openingReceivables.length > 0 ? (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {openingCapital.openingReceivables.map((receivable) => (
+                    <div key={receivable.id} className="bg-gray-50 p-2 rounded">
+                      <div className="flex justify-between text-xs">
+                        <span className="font-medium">{receivable.creditorName}</span>
+                        <span className="font-bold">{formatCurrency(receivable.originalAmount)}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1">{receivable.description}</div>
+                      {receivable.paidAmount > 0 && (
+                        <div className="text-xs text-green-600 mt-1">
+                          Paid: {formatCurrency(receivable.paidAmount)} | 
+                          Remaining: {formatCurrency(receivable.remainingBalance)}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center text-gray-400 py-4">
+                  <p className="text-sm">No opening receivables found</p>
+                  <p className="text-xs">All receivables were created after business start</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Recent Transactions */}
       <Card variant="accent">

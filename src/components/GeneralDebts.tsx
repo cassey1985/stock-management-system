@@ -8,6 +8,7 @@ const GeneralDebts: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingDebt, setEditingDebt] = useState<GeneralDebt | null>(null);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [selectedDebt, setSelectedDebt] = useState<GeneralDebt | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'payable' | 'receivable'>('all');
@@ -29,7 +30,8 @@ const GeneralDebts: React.FC = () => {
     issueDate: new Date().toISOString().split('T')[0],
     priority: 'medium' as 'low' | 'medium' | 'high',
     notes: '',
-    reference: ''
+    reference: '',
+    isOpeningBalance: false
   });
 
   const [paymentForm, setPaymentForm] = useState({
@@ -121,17 +123,36 @@ const GeneralDebts: React.FC = () => {
     try {
       setIsSubmitting(true);
       const amount = parseFloat(newDebt.originalAmount);
-      const debt = {
-        ...newDebt,
-        originalAmount: amount,
-        paidAmount: 0,
-        remainingBalance: amount,
-        status: 'active' as const
-      };
+      
+      if (editingDebt) {
+        // Update existing debt
+        const updates = {
+          ...newDebt,
+          originalAmount: amount,
+          // Keep existing paidAmount and remainingBalance, just update other fields
+        };
+        await apiService.updateGeneralDebt(editingDebt.id, updates);
+      } else {
+        // Create new debt
+        let issueDate = newDebt.issueDate;
+        
+        // Note: Opening balance validation can be added here if needed
+        // For now, we trust the user to enter appropriate dates for opening balance items
+        
+        const debt = {
+          ...newDebt,
+          issueDate,
+          originalAmount: amount,
+          paidAmount: 0,
+          remainingBalance: amount,
+          status: 'active' as const
+        };
+        await apiService.createGeneralDebt(debt);
+      }
 
-      await apiService.createGeneralDebt(debt);
       await fetchDebts();
       setShowAddForm(false);
+      setEditingDebt(null);
       setNewDebt({
         type: 'payable',
         category: '',
@@ -143,15 +164,54 @@ const GeneralDebts: React.FC = () => {
         issueDate: new Date().toISOString().split('T')[0],
         priority: 'medium',
         notes: '',
-        reference: ''
+        reference: '',
+        isOpeningBalance: false
       });
-      setSuccessMessage(`${debt.type === 'payable' ? 'Payable' : 'Receivable'} debt created successfully!`);
+      setSuccessMessage(`${editingDebt ? 'Updated' : 'Created'} ${newDebt.type === 'payable' ? 'payable' : 'receivable'} debt successfully!`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create debt');
+      setError(err instanceof Error ? err.message : `Failed to ${editingDebt ? 'update' : 'create'} debt`);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleEditDebt = (debt: GeneralDebt) => {
+    setEditingDebt(debt);
+    setNewDebt({
+      type: debt.type,
+      category: debt.category,
+      description: debt.description,
+      creditorName: debt.creditorName,
+      creditorContact: debt.creditorContact || '',
+      originalAmount: debt.originalAmount.toString(),
+      dueDate: debt.dueDate ? new Date(debt.dueDate).toISOString().split('T')[0] : '',
+      issueDate: new Date(debt.issueDate).toISOString().split('T')[0],
+      priority: debt.priority,
+      notes: debt.notes || '',
+      reference: debt.reference || '',
+      isOpeningBalance: false
+    });
+    setShowAddForm(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingDebt(null);
+    setShowAddForm(false);
+    setNewDebt({
+      type: 'payable',
+      category: '',
+      description: '',
+      creditorName: '',
+      creditorContact: '',
+      originalAmount: '',
+      dueDate: '',
+      issueDate: new Date().toISOString().split('T')[0],
+      priority: 'medium',
+      notes: '',
+      reference: '',
+      isOpeningBalance: false
+    });
   };
 
   const handlePayment = async (e: React.FormEvent) => {
@@ -289,13 +349,38 @@ const GeneralDebts: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-gray-900">General Debts Management</h1>
-        <Button
-          onClick={() => setShowAddForm(true)}
-          variant="primary"
-          className="flex items-center gap-2"
-        >
-          ➕ Add Debt
-        </Button>
+        <div className="flex items-center gap-4">
+          <Button
+            onClick={() => {
+              setNewDebt({
+                type: 'receivable',
+                category: '',
+                description: '',
+                creditorName: '',
+                creditorContact: '',
+                originalAmount: '',
+                dueDate: '',
+                issueDate: '', // User will set appropriate opening balance date
+                priority: 'medium',
+                notes: '',
+                reference: '',
+                isOpeningBalance: true
+              });
+              setShowAddForm(true);
+            }}
+            variant="accent"
+            className="flex items-center gap-2"
+          >
+            🏛️ Add Opening Receivable
+          </Button>
+          <Button
+            onClick={() => setShowAddForm(true)}
+            variant="primary"
+            className="flex items-center gap-2"
+          >
+            ➕ Add Debt
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -467,7 +552,9 @@ const GeneralDebts: React.FC = () => {
               justifyContent: 'space-between',
               alignItems: 'center'
             }}>
-              <h3 style={{ margin: '0', fontSize: '20px', fontWeight: 'bold' }}>💰 Add New Debt</h3>
+              <h3 style={{ margin: '0', fontSize: '20px', fontWeight: 'bold' }}>
+                💰 {editingDebt ? 'Edit Debt' : 'Add New Debt'}
+              </h3>
               <button
                 onClick={() => setShowAddForm(false)}
                 style={{
@@ -484,6 +571,21 @@ const GeneralDebts: React.FC = () => {
             </div>
             
             <div style={{ padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>
+              {/* Instructions for Opening Receivables */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                <h4 className="text-sm font-bold text-blue-800 mb-2">💡 Adding Your Old Receivables (Opening Balance)</h4>
+                <p className="text-sm text-blue-700 mb-2">
+                  To record money that people owed you before your business started:
+                </p>
+                <ol className="text-xs text-blue-600 ml-4 space-y-1">
+                  <li>1. Select <strong>"Receivable (They owe us)"</strong></li>
+                  <li>2. Choose appropriate category (Personal Loan, Advance, etc.)</li>
+                  <li>3. Enter creditor details and amount</li>
+                  <li>4. ✅ <strong>Check "Opening Balance Item"</strong> - This is important!</li>
+                  <li>5. Save - it will appear in your Opening Capital section</li>
+                </ol>
+              </div>
+
               <form onSubmit={handleAddDebt} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -519,6 +621,40 @@ const GeneralDebts: React.FC = () => {
                     ))}
                   </select>
                   {formErrors.category && <p className="text-red-600 text-sm mt-1">{formErrors.category}</p>}
+                </div>
+              </div>
+
+              {/* Opening Balance Checkbox */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="isOpeningBalance"
+                    checked={newDebt.isOpeningBalance}
+                    onChange={(e) => {
+                      const isOpeningBalance = e.target.checked;
+                      
+                      setNewDebt({ 
+                        ...newDebt, 
+                        isOpeningBalance
+                      });
+                    }}
+                    className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isOpeningBalance" className="flex-1">
+                    <div className="text-sm font-semibold text-yellow-800">
+                      🏛️ This is an Opening Balance Item
+                    </div>
+                    <div className="text-xs text-yellow-700 mt-1">
+                      Check this box if this {newDebt.type === 'receivable' ? 'receivable' : 'debt'} existed before your business started. 
+                      This will be treated as part of your initial capital.
+                    </div>
+                    {newDebt.isOpeningBalance && (
+                      <div className="text-xs text-green-700 mt-2 font-medium">
+                        ✅ Will be recorded as opening capital - ensure the issue date is before your business start date.
+                      </div>
+                    )}
+                  </label>
                 </div>
               </div>
 
@@ -588,7 +724,9 @@ const GeneralDebts: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="form-label">Issue Date *</label>
+                  <label className="form-label">
+                    Issue Date *
+                  </label>
                   <input
                     type="date"
                     className={`form-input ${formErrors.issueDate ? 'border-red-500' : ''}`}
@@ -657,13 +795,16 @@ const GeneralDebts: React.FC = () => {
                   className="flex-1"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? '⏳ Creating...' : '✅ Create Debt'}
+                  {isSubmitting ? 
+                    (editingDebt ? '⏳ Updating...' : '⏳ Creating...') : 
+                    (editingDebt ? '✅ Update Debt' : '✅ Create Debt')
+                  }
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
                   className="flex-1"
-                  onClick={() => {
+                  onClick={editingDebt ? cancelEdit : () => {
                     setShowAddForm(false);
                     setFormErrors({});
                   }}
@@ -680,66 +821,321 @@ const GeneralDebts: React.FC = () => {
 
       {/* Payment Modal */}
       {showPaymentForm && selectedDebt && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Record Payment</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                {selectedDebt.description} - {selectedDebt.creditorName}
-              </p>
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px',
+            zIndex: 9999
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPaymentForm(false);
+              setSelectedDebt(null);
+              setFormErrors({});
+            }
+          }}
+        >
+          <div 
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              border: '1px solid #e5e7eb',
+              width: '100%',
+              maxWidth: '600px',
+              maxHeight: '80vh',
+              overflowY: 'auto',
+              transform: 'scale(1)',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {/* Modal Header */}
+            <div 
+              style={{
+                background: 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                padding: '24px 32px',
+                borderRadius: '20px 20px 0 0',
+                borderBottom: '2px solid #e5e7eb'
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-5">
+                  <div 
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      backgroundColor: '#22c55e',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      border: '2px solid rgba(255, 255, 255, 0.3)'
+                    }}
+                  >
+                    <span style={{ color: 'white', fontSize: '24px' }}>💰</span>
+                  </div>
+                  <div>
+                    <h3 style={{ 
+                      color: 'white', 
+                      fontSize: '24px', 
+                      fontWeight: 'bold', 
+                      margin: '0 0 4px 0' 
+                    }}>
+                      Record Payment
+                    </h3>
+                    <p style={{ 
+                      color: 'rgba(255, 255, 255, 0.8)', 
+                      fontSize: '14px', 
+                      margin: '0',
+                      maxWidth: '300px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {selectedDebt.description}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentForm(false);
+                    setSelectedDebt(null);
+                    setFormErrors({});
+                  }}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.2)',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '40px',
+                    height: '40px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s ease',
+                    color: 'white'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.3)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                  }}
+                >
+                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
             
-            <form onSubmit={handlePayment} className="p-6 space-y-4">
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <div className="flex justify-between text-sm">
-                  <span>Outstanding Balance:</span>
-                  <span className="font-bold text-red-600">{formatCurrency(selectedDebt.remainingBalance)}</span>
+            {/* Modal Body */}
+            <div style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+              {/* Outstanding Balance Card */}
+              <div 
+                style={{
+                  background: 'linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)',
+                  border: '2px solid #fecaca',
+                  borderRadius: '16px',
+                  padding: '24px'
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div 
+                      style={{
+                        width: '48px',
+                        height: '48px',
+                        backgroundColor: '#ef4444',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: '2px solid #dc2626'
+                      }}
+                    >
+                      <span style={{ color: 'white', fontSize: '20px', fontWeight: 'bold' }}>₱</span>
+                    </div>
+                    <span style={{ color: '#b91c1c', fontWeight: '600', fontSize: '18px' }}>Outstanding Balance</span>
+                  </div>
+                  <span style={{ fontSize: '32px', fontWeight: 'bold', color: '#dc2626' }}>
+                    {formatCurrency(selectedDebt.remainingBalance)}
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <label className="form-label">Payment Amount (PHP) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  className={`form-input ${formErrors.amount ? 'border-red-500' : ''}`}
-                  value={paymentForm.amount}
-                  onChange={(e) => {
-                    setPaymentForm({ ...paymentForm, amount: e.target.value });
-                    if (formErrors.amount) setFormErrors({ ...formErrors, amount: '' });
-                  }}
-                  max={selectedDebt.remainingBalance}
-                  placeholder="0.00"
-                  required
-                  autoFocus
-                />
-                {formErrors.amount && <p className="text-red-600 text-sm mt-1">{formErrors.amount}</p>}
+              {/* Payment Amount */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: '#374151',
+                  display: 'block'
+                }}>
+                  Payment Amount (PHP) <span style={{ color: '#ef4444' }}>*</span>
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <div 
+                    style={{
+                      position: 'absolute',
+                      left: '0',
+                      top: '0',
+                      bottom: '0',
+                      paddingLeft: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      pointerEvents: 'none'
+                    }}
+                  >
+                    <span style={{ color: '#6b7280', fontSize: '24px', fontWeight: 'bold' }}>₱</span>
+                  </div>
+                  <input
+                    type="number"
+                    step="0.01"
+                    style={{
+                      width: '100%',
+                      paddingLeft: '60px',
+                      paddingRight: '20px',
+                      paddingTop: '20px',
+                      paddingBottom: '20px',
+                      border: formErrors.amount ? '3px solid #f87171' : '2px solid #d1d5db',
+                      borderRadius: '12px',
+                      fontSize: '24px',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      backgroundColor: 'white'
+                    }}
+                    value={paymentForm.amount}
+                    onChange={(e) => {
+                      setPaymentForm({ ...paymentForm, amount: e.target.value });
+                      if (formErrors.amount) setFormErrors({ ...formErrors, amount: '' });
+                    }}
+                    onFocus={(e) => {
+                      if (!formErrors.amount) {
+                        e.target.style.borderColor = '#22c55e';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!formErrors.amount) {
+                        e.target.style.borderColor = '#d1d5db';
+                        e.target.style.boxShadow = 'none';
+                      }
+                    }}
+                    max={selectedDebt.remainingBalance}
+                    placeholder="0.00"
+                    required
+                    autoFocus
+                  />
+                </div>
+                {formErrors.amount && (
+                  <p style={{ 
+                    color: '#ef4444', 
+                    fontSize: '14px', 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '8px',
+                    margin: '0'
+                  }}>
+                    <span>⚠️</span>
+                    <span>{formErrors.amount}</span>
+                  </p>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Payment Date *</label>
+              {/* Payment Date and Method */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: '#374151',
+                    display: 'block'
+                  }}>
+                    Payment Date <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <input
                     type="date"
-                    className={`form-input ${formErrors.paymentDate ? 'border-red-500' : ''}`}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      border: formErrors.paymentDate ? '3px solid #f87171' : '2px solid #d1d5db',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      backgroundColor: 'white'
+                    }}
                     value={paymentForm.paymentDate}
                     onChange={(e) => {
                       setPaymentForm({ ...paymentForm, paymentDate: e.target.value });
                       if (formErrors.paymentDate) setFormErrors({ ...formErrors, paymentDate: '' });
                     }}
+                    onFocus={(e) => {
+                      if (!formErrors.paymentDate) {
+                        e.target.style.borderColor = '#22c55e';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!formErrors.paymentDate) {
+                        e.target.style.borderColor = '#d1d5db';
+                        e.target.style.boxShadow = 'none';
+                      }
+                    }}
                     required
                   />
-                  {formErrors.paymentDate && <p className="text-red-600 text-sm mt-1">{formErrors.paymentDate}</p>}
+                  {formErrors.paymentDate && (
+                    <p style={{ color: '#ef4444', fontSize: '12px', margin: '0' }}>⚠️ {formErrors.paymentDate}</p>
+                  )}
                 </div>
 
-                <div>
-                  <label className="form-label">Payment Method *</label>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <label style={{ 
+                    fontSize: '16px', 
+                    fontWeight: '600', 
+                    color: '#374151',
+                    display: 'block'
+                  }}>
+                    Payment Method <span style={{ color: '#ef4444' }}>*</span>
+                  </label>
                   <select
-                    className={`form-select ${formErrors.paymentMethod ? 'border-red-500' : ''}`}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      border: formErrors.paymentMethod ? '3px solid #f87171' : '2px solid #d1d5db',
+                      borderRadius: '12px',
+                      fontSize: '16px',
+                      transition: 'all 0.2s ease',
+                      outline: 'none',
+                      backgroundColor: 'white'
+                    }}
                     value={paymentForm.paymentMethod}
                     onChange={(e) => {
                       setPaymentForm({ ...paymentForm, paymentMethod: e.target.value as GeneralDebtPayment['paymentMethod'] });
                       if (formErrors.paymentMethod) setFormErrors({ ...formErrors, paymentMethod: '' });
+                    }}
+                    onFocus={(e) => {
+                      if (!formErrors.paymentMethod) {
+                        e.target.style.borderColor = '#22c55e';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+                      }
+                    }}
+                    onBlur={(e) => {
+                      if (!formErrors.paymentMethod) {
+                        e.target.style.borderColor = '#d1d5db';
+                        e.target.style.boxShadow = 'none';
+                      }
                     }}
                   >
                     <option value="cash">💵 Cash</option>
@@ -748,56 +1144,197 @@ const GeneralDebts: React.FC = () => {
                     <option value="check">📝 Check</option>
                     <option value="other">🔄 Other</option>
                   </select>
-                  {formErrors.paymentMethod && <p className="text-red-600 text-sm mt-1">{formErrors.paymentMethod}</p>}
+                  {formErrors.paymentMethod && (
+                    <p style={{ color: '#ef4444', fontSize: '12px', margin: '0' }}>⚠️ {formErrors.paymentMethod}</p>
+                  )}
                 </div>
               </div>
 
-              <div>
-                <label className="form-label">Reference</label>
+              {/* Reference */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: '#374151',
+                  display: 'block'
+                }}>
+                  Reference
+                </label>
                 <input
                   type="text"
-                  className="form-input"
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    transition: 'all 0.2s ease',
+                    outline: 'none',
+                    backgroundColor: 'white'
+                  }}
                   value={paymentForm.reference}
                   onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#22c55e';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.boxShadow = 'none';
+                  }}
                   placeholder="Receipt #, Transaction ID, etc..."
                 />
               </div>
 
-              <div>
-                <label className="form-label">Notes</label>
+              {/* Notes */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <label style={{ 
+                  fontSize: '16px', 
+                  fontWeight: '600', 
+                  color: '#374151',
+                  display: 'block'
+                }}>
+                  Notes
+                </label>
                 <textarea
-                  className="form-input"
-                  rows={2}
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    border: '2px solid #d1d5db',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    transition: 'all 0.2s ease',
+                    outline: 'none',
+                    backgroundColor: 'white',
+                    resize: 'none',
+                    minHeight: '120px'
+                  }}
+                  rows={5}
                   value={paymentForm.notes}
                   onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })}
-                  placeholder="Additional notes..."
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#22c55e';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(34, 197, 94, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#d1d5db';
+                    e.target.style.boxShadow = 'none';
+                  }}
+                  placeholder="Additional notes or comments..."
                 />
               </div>
+            </div>
 
-              <div className="flex gap-3 pt-4 border-t border-gray-200">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  className="flex-1"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? '⏳ Recording...' : '💰 Record Payment'}
-                </Button>
-                <Button
+            {/* Modal Footer */}
+            <div 
+              style={{
+                padding: '24px 32px',
+                backgroundColor: '#f9fafb',
+                borderRadius: '0 0 20px 20px',
+                borderTop: '2px solid #e5e7eb'
+              }}
+            >
+              <div style={{ display: 'flex', gap: '16px' }}>
+                <button
                   type="button"
-                  variant="outline"
-                  className="flex-1"
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    const fakeEvent = { preventDefault: () => {} } as React.FormEvent;
+                    handlePayment(fakeEvent);
+                  }}
+                  style={{
+                    flex: '1',
+                    background: isSubmitting ? '#9ca3af' : 'linear-gradient(135deg, #16a34a 0%, #15803d 100%)',
+                    color: 'white',
+                    fontWeight: '600',
+                    fontSize: '16px',
+                    padding: '16px 24px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(34, 197, 94, 0.3)',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSubmitting) {
+                      e.currentTarget.style.transform = 'translateY(-2px)';
+                      e.currentTarget.style.boxShadow = '0 6px 16px rgba(34, 197, 94, 0.4)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSubmitting) {
+                      e.currentTarget.style.transform = 'translateY(0)';
+                      e.currentTarget.style.boxShadow = '0 4px 12px rgba(34, 197, 94, 0.3)';
+                    }
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div 
+                        style={{
+                          width: '20px',
+                          height: '20px',
+                          border: '2px solid white',
+                          borderTop: '2px solid transparent',
+                          borderRadius: '50%',
+                          animation: 'spin 1s linear infinite'
+                        }}
+                      ></div>
+                      <span>Recording...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>💰</span>
+                      <span>Record Payment</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
                   onClick={() => {
                     setShowPaymentForm(false);
                     setSelectedDebt(null);
                     setFormErrors({});
                   }}
                   disabled={isSubmitting}
+                  style={{
+                    flex: '1',
+                    background: 'white',
+                    color: '#374151',
+                    fontWeight: '600',
+                    fontSize: '16px',
+                    padding: '16px 24px',
+                    borderRadius: '12px',
+                    border: '2px solid #d1d5db',
+                    cursor: isSubmitting ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '12px'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isSubmitting) {
+                      e.currentTarget.style.backgroundColor = '#f3f4f6';
+                      e.currentTarget.style.borderColor = '#9ca3af';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isSubmitting) {
+                      e.currentTarget.style.backgroundColor = 'white';
+                      e.currentTarget.style.borderColor = '#d1d5db';
+                    }
+                  }}
                 >
-                  ❌ Cancel
-                </Button>
+                  <span>❌</span>
+                  <span>Cancel</span>
+                </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
@@ -923,6 +1460,14 @@ const GeneralDebts: React.FC = () => {
                           💰 Pay
                         </Button>
                       )}
+                      <Button
+                        onClick={() => handleEditDebt(debt)}
+                        variant="outline"
+                        size="sm"
+                        className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 border-blue-300 text-xs px-2 py-1"
+                      >
+                        ✏️ Edit
+                      </Button>
                       <Button
                         onClick={() => handleDeleteDebt(debt.id, debt.description, debt.creditorName)}
                         variant="outline"

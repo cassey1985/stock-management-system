@@ -110,7 +110,7 @@ export interface Payment {
 export interface Transaction {
   id: string;
   date: string;
-  type: 'stock_in' | 'stock_out' | 'opening_stock' | 'payment_received' | 'payment_made' | 'debt_created' | 'expense' | 'adjustment';
+  type: 'stock_in' | 'stock_out' | 'opening_stock' | 'opening_balance' | 'payment_received' | 'payment_made' | 'debt_created' | 'expense' | 'adjustment';
   category: string;
   description: string;
   reference?: string;
@@ -181,4 +181,60 @@ export interface FIFOResult {
     pricePerUnit: number;
     cost: number;
   }>;
+}
+
+// Customer Management Types
+export interface Customer {
+  name: string;
+  totalSales: number;
+  totalDebt: number;
+  lastTransaction: string | null;
+  status: 'active' | 'inactive';
+}
+
+export interface CustomerSearchResult {
+  name: string;
+  type: 'sales_customer' | 'general_debtor' | 'both';
+  totalDebt: number;
+  lastActivity: string;
+}
+
+export interface CustomerProfile {
+  customerName: string;
+  totalPurchases: number;
+  totalSales: number;
+  totalPaid: number;
+  totalDebt: number;
+  customerDebts: CustomerDebt[];
+  generalDebts: GeneralDebt[];
+  salesHistory: StockOutEntry[];
+  paymentHistory: (Payment | GeneralDebtPayment)[];
+  allTransactions: any[];
+}
+
+export interface OpeningCapital {
+  totalOpeningStock: number;
+  openingStockEntries: {
+    id: string;
+    date: string;
+    productName: string;
+    quantity: number;
+    purchasePrice: number;
+    totalValue: number;
+    notes?: string;
+  }[];
+  totalOpeningReceivables: number;
+  openingReceivables: {
+    id: string;
+    issueDate: string;
+    creditorName: string;
+    description: string;
+    category: string;
+    originalAmount: number;
+    paidAmount: number;
+    remainingBalance: number;
+    notes?: string;
+    reference?: string;
+  }[];
+  totalOpeningCapital: number;
 }

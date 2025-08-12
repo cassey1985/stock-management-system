@@ -280,16 +280,6 @@ const CustomerDebts: React.FC = () => {
     setShowMultiPaymentForm(true);
   };
 
-  const calculateProportionalPayments = () => {
-    const selectedDebtObjects = debts.filter(debt => selectedDebts.includes(debt.id));
-    const totalAmountPaid = parseFloat(multiPaymentForm.totalAmountPaid) || 0;
-    const totalDebtAmount = selectedDebtObjects.reduce((sum, debt) => sum + debt.remainingBalance, 0);
-    
-    if (totalAmountPaid > 0 && totalDebtAmount > 0) {
-      // This would update individual allocations in a more complex implementation
-      // For now, we'll handle this in the submission logic
-    }
-  };
 
   const handleDeleteDebt = async (id: string, customerName: string, productName: string) => {
     if (window.confirm(`Are you sure you want to delete the debt for "${customerName}" - "${productName}"? This action cannot be undone.`)) {

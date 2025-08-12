@@ -30,7 +30,6 @@ const CustomerProfile: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'profile'>('list');
 
-  // Load all customers on component mount
   useEffect(() => {
     loadCustomers();
   }, []);
@@ -81,11 +80,9 @@ const CustomerProfile: React.FC = () => {
       setLoading(true);
       await apiService.deleteCustomer(customerName);
       
-      // Show success message
-      alert(`✅ Customer "${customerName}" and all related data have been successfully deleted.`);
+        alert(`✅ Customer "${customerName}" and all related data have been successfully deleted.`);
       
-      // Go back to customer list and reload customers
-      setViewMode('list');
+           setViewMode('list');
       setCustomerProfile(null);
       await loadCustomers(); // Refresh the customer list
       
@@ -106,7 +103,7 @@ const CustomerProfile: React.FC = () => {
     try {
       setLoading(true);
       const response = await apiService.searchCustomers(searchTerm);
-      // Convert search results to customer format
+    
       const searchResults = response.map((result: any) => ({
         name: result.name,
         totalSales: 0, // Search results don't include sales data

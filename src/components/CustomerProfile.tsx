@@ -24,7 +24,6 @@ interface Customer {
 
 const CustomerProfile: React.FC = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);

@@ -16,7 +16,8 @@ import {
   InventoryBatch,
   User,
   LoginRequest,
-  MultiProductSale
+  MultiProductSale,
+  MultiPayment
 } from './types';
 
 // Data persistence configuration

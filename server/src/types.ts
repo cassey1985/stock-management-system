@@ -75,8 +75,34 @@ export interface StockOutEntry {
   paymentStatus: 'paid' | 'partial' | 'unpaid';
   dueDate?: Date;
   notes?: string;
+  // New fields for multi-product sales
+  saleGroupId?: string; // Groups related sale items together
+  isMultiProductSale?: boolean; // Indicates if this is part of a multi-product sale
+  allocatedPayment?: number; // Payment amount allocated to this specific product
   createdAt: Date;
   updatedAt: Date;
+}
+
+// New interfaces for multi-product sales
+export interface MultiProductSaleItem {
+  productCode: string;
+  productName: string;
+  quantity: number;
+  sellingPrice: number;
+  totalSale: number;
+  allocatedPayment: number;
+}
+
+export interface MultiProductSale {
+  date: Date;
+  customerName: string;
+  customerContact?: string;
+  items: MultiProductSaleItem[];
+  totalSaleAmount: number;
+  totalAmountPaid: number;
+  paymentAllocation: 'proportional' | 'manual';
+  dueDate?: Date;
+  notes?: string;
 }
 
 export interface CustomerDebt {
@@ -111,6 +137,27 @@ export interface Payment {
   createdAt: Date;
 }
 
+// Multi-Payment Types
+export interface MultiPaymentDebtItem {
+  debtId: string;
+  customerName: string;
+  productName: string;
+  totalDebt: number;
+  remainingBalance: number;
+  allocatedPayment: number;
+}
+
+export interface MultiPayment {
+  customerName: string;
+  debts: MultiPaymentDebtItem[];
+  totalAmountPaid: number;
+  paymentAllocation: 'proportional' | 'manual';
+  paymentDate: Date;
+  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'check' | 'other';
+  reference?: string;
+  notes?: string;
+}
+
 export interface GeneralDebt {
   id: string;
   type: 'payable' | 'receivable'; // payable = we owe, receivable = they owe us
@@ -127,6 +174,7 @@ export interface GeneralDebt {
   status: 'active' | 'paid' | 'overdue' | 'cancelled';
   notes?: string;
   reference?: string;
+  isOpeningBalance?: boolean; // Flag for opening balance receivables
   createdAt: Date;
   updatedAt: Date;
 }

@@ -71,8 +71,36 @@ export interface StockOutEntry {
   paymentStatus: 'paid' | 'partial' | 'unpaid';
   dueDate?: string;
   notes?: string;
+  // New fields for multi-product sales
+  saleGroupId?: string; // Groups related sale items together
+  isMultiProductSale?: boolean; // Indicates if this is part of a multi-product sale
+  allocatedPayment?: number; // Payment amount allocated to this specific product
   createdAt: string;
   updatedAt: string;
+}
+
+// New interfaces for multi-product sales
+export interface MultiProductSaleItem {
+  productCode: string;
+  productName: string;
+  quantity: number;
+  sellingPrice: number;
+  totalSale: number;
+  allocatedPayment: number;
+  totalCost?: number; // Will be calculated via FIFO
+  profit?: number; // Will be calculated
+}
+
+export interface MultiProductSale {
+  date: string;
+  customerName: string;
+  customerContact?: string;
+  items: MultiProductSaleItem[];
+  totalSaleAmount: number;
+  totalAmountPaid: number;
+  paymentAllocation: 'proportional' | 'manual';
+  dueDate?: string;
+  notes?: string;
 }
 
 export interface CustomerDebt {
@@ -105,6 +133,27 @@ export interface Payment {
   reference?: string;
   notes?: string;
   createdAt: string;
+}
+
+// Multi-Payment Types
+export interface MultiPaymentDebtItem {
+  debtId: string;
+  customerName: string;
+  productName: string;
+  totalDebt: number;
+  remainingBalance: number;
+  allocatedPayment: number;
+}
+
+export interface MultiPayment {
+  customerName: string;
+  debts: MultiPaymentDebtItem[];
+  totalAmountPaid: number;
+  paymentAllocation: 'proportional' | 'manual';
+  paymentDate: string;
+  paymentMethod: 'cash' | 'card' | 'bank_transfer' | 'check' | 'other';
+  reference?: string;
+  notes?: string;
 }
 
 export interface Transaction {

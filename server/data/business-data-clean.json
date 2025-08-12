@@ -1,0 +1,43 @@
+{
+  "products": [],
+  "inventory": [],
+  "transactions": [],
+  "customers": [],
+  "generalDebts": [],
+  "debtPayments": [],
+  "users": [
+    {
+      "id": "admin-001",
+      "username": "admin",
+      "password": "$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi",
+      "role": "admin",
+      "name": "Administrator",
+      "isActive": true,
+      "createdAt": "2025-08-06T09:00:00.000Z"
+    },
+    {
+      "id": "sales-001", 
+      "username": "sales01",
+      "password": "$2b$10$hash_for_sales123",
+      "role": "sales",
+      "name": "Sales User 1",
+      "isActive": true,
+      "createdAt": "2025-08-06T09:00:00.000Z"
+    },
+    {
+      "id": "cashier-001",
+      "username": "cashier01", 
+      "password": "$2b$10$hash_for_cashier123",
+      "role": "cashier",
+      "name": "Cashier User 1",
+      "isActive": true,
+      "createdAt": "2025-08-06T09:00:00.000Z"
+    }
+  ],
+  "openingCapital": {
+    "totalOpeningStock": 0,
+    "totalOpeningReceivables": 0,
+    "totalOpeningCapital": 0,
+    "lastCalculated": "2025-08-10T00:00:00.000Z"
+  }
+}

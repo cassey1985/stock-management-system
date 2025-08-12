@@ -15,7 +15,8 @@ import {
   DashboardStats,
   InventoryBatch,
   User,
-  LoginRequest
+  LoginRequest,
+  MultiProductSale
 } from './types';
 
 // Data persistence configuration
@@ -326,6 +327,115 @@ class DataService {
     return stockOutEntry;
   }
 
+  // Multi-Product Sale with Payment Allocation
+  addMultiProductSale(saleData: MultiProductSale): StockOutEntry[] {
+    const saleGroupId = uuidv4(); // Group related products together
+    const saleDate = typeof saleData.date === 'string' ? new Date(saleData.date) : saleData.date;
+    const stockOutEntries: StockOutEntry[] = [];
+    
+    // Calculate payment allocation
+    let totalSaleValue = 0;
+    const itemsWithCosts: Array<{
+      item: typeof saleData.items[0];
+      fifoResult: FIFOResult;
+      totalSale: number;
+    }> = [];
+
+    // First pass: calculate FIFO costs and totals
+    for (const item of saleData.items) {
+      const fifoResult = this.calculateFIFOCost(item.productCode, item.quantity);
+      const totalSale = item.quantity * item.sellingPrice;
+      totalSaleValue += totalSale;
+      
+      itemsWithCosts.push({
+        item,
+        fifoResult,
+        totalSale
+      });
+    }
+
+    // Second pass: allocate payments and create entries
+    let remainingPayment = saleData.totalAmountPaid;
+    
+    for (const { item, fifoResult, totalSale } of itemsWithCosts) {
+      let allocatedPayment = 0;
+      
+      if (saleData.paymentAllocation === 'proportional') {
+        // Proportional allocation based on item value
+        const proportion = totalSale / totalSaleValue;
+        allocatedPayment = Math.round(saleData.totalAmountPaid * proportion * 100) / 100;
+      } else {
+        // Manual allocation - use the amount specified for this item
+        allocatedPayment = item.allocatedPayment;
+      }
+
+      // Ensure we don't over-allocate payment
+      if (allocatedPayment > remainingPayment) {
+        allocatedPayment = remainingPayment;
+      }
+      remainingPayment -= allocatedPayment;
+
+      // Determine payment status for this item
+      let paymentStatus: 'paid' | 'partial' | 'unpaid' = 'paid';
+      if (allocatedPayment < totalSale) {
+        paymentStatus = allocatedPayment > 0 ? 'partial' : 'unpaid';
+      }
+
+      const profit = totalSale - fifoResult.totalCost;
+
+      // Create stock out entry for this item
+      const stockOutEntry: StockOutEntry = {
+        id: uuidv4(),
+        date: saleDate,
+        productId: this.products.find(p => p.code === item.productCode)?.id || '',
+        productCode: item.productCode,
+        productName: item.productName,
+        quantity: item.quantity,
+        sellingPrice: item.sellingPrice,
+        customerName: saleData.customerName,
+        customerContact: saleData.customerContact,
+        totalCost: fifoResult.totalCost,
+        totalSale: totalSale,
+        profit: profit,
+        amountPaid: allocatedPayment,
+        paymentStatus: paymentStatus,
+        dueDate: saleData.dueDate ? (typeof saleData.dueDate === 'string' ? new Date(saleData.dueDate) : saleData.dueDate) : undefined,
+        notes: saleData.notes,
+        // Multi-product sale specific fields
+        saleGroupId: saleGroupId,
+        isMultiProductSale: true,
+        allocatedPayment: allocatedPayment,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      stockOutEntries.push(stockOutEntry);
+      this.stockOutEntries.push(stockOutEntry);
+      
+      // Update stock quantities
+      this.updateStockQuantities(fifoResult.usedBatches);
+
+      // Add transaction record for this item
+      this.addTransaction({
+        type: 'stock_out',
+        category: 'Sales',
+        description: `Sale: ${stockOutEntry.productName} to ${stockOutEntry.customerName} (Multi-Product Sale)`,
+        reference: stockOutEntry.id,
+        debitAmount: 0,
+        creditAmount: totalSale,
+        date: stockOutEntry.date
+      });
+
+      // Create customer debt if underpaid
+      if (allocatedPayment < totalSale) {
+        this.createCustomerDebt(stockOutEntry);
+      }
+    }
+
+    this.persistData(); // Save after adding all entries
+    return stockOutEntries;
+  }
+
   getStockOutEntries(): StockOutEntry[] {
     return this.stockOutEntries.sort((a, b) => b.date.getTime() - a.date.getTime());
   }
@@ -510,6 +620,52 @@ class DataService {
     return payment;
   }
 
+  addMultiPayment(multiPaymentData: MultiPayment): Payment[] {
+    const payments: Payment[] = [];
+    const paymentDate = new Date(multiPaymentData.paymentDate);
+    
+    // Create individual payment records for each debt
+    for (const debtItem of multiPaymentData.debts) {
+      const payment: Payment = {
+        id: uuidv4(),
+        debtId: debtItem.debtId,
+        customerName: debtItem.customerName,
+        amount: debtItem.allocatedPayment,
+        paymentDate: paymentDate,
+        paymentMethod: multiPaymentData.paymentMethod,
+        reference: multiPaymentData.reference,
+        notes: multiPaymentData.notes ? `Multi-payment: ${multiPaymentData.notes}` : 'Multi-payment transaction',
+        createdAt: new Date()
+      };
+      
+      payments.push(payment);
+      this.payments.push(payment);
+
+      // Update customer debt
+      const debt = this.customerDebts.find(d => d.id === payment.debtId);
+      if (debt) {
+        debt.paymentReceived += payment.amount;
+        debt.remainingBalance = debt.totalSale - (debt.amountPaid + debt.paymentReceived);
+        debt.status = debt.remainingBalance <= 0 ? 'paid' : 'unpaid';
+        debt.updatedAt = new Date();
+      }
+
+      // Add transaction record for each payment
+      this.addTransaction({
+        type: 'payment_received',
+        category: 'Payments',
+        description: `Multi-payment from ${payment.customerName} for ${debtItem.productName}`,
+        reference: payment.id,
+        debitAmount: 0,
+        creditAmount: payment.amount,
+        date: payment.paymentDate
+      });
+    }
+
+    this.persistData(); // Save after processing all payments
+    return payments;
+  }
+
   getPayments(): Payment[] {
     try {
       return this.payments.sort((a, b) => {
@@ -678,12 +834,9 @@ class DataService {
     };
     this.generalDebts.push(debt);
 
-    // For opening balance detection, we'll use a flexible approach:
-    // If the debt has very old dates (more than 1 year ago), treat as opening balance
-    // This can be adjusted based on when you started using the system
-    const cutoffDate = new Date();
-    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1); // 1 year ago as default
-    const isOpeningBalance = debt.issueDate <= cutoffDate;
+    // Check if this is marked as an opening balance
+    // Priority: explicit isOpeningBalance flag, then date-based detection
+    const isOpeningBalance = debt.isOpeningBalance || (debt.issueDate <= new Date(new Date().setFullYear(new Date().getFullYear() - 1)));
 
     // Add transaction record based on debt type and whether it's opening balance
     if (debt.type === 'payable') {
@@ -740,8 +893,8 @@ class DataService {
           category: `Accounts Receivable - ${debt.category}`,
           description: `Receivable created: ${debt.description} (${debt.creditorName})`,
           reference: debt.id,
-          debitAmount: 0,
-          creditAmount: debt.originalAmount, // Income or receivable
+          debitAmount: debt.originalAmount, // Asset (receivable)
+          creditAmount: 0,
           date: debt.issueDate
         });
       }
@@ -1277,20 +1430,16 @@ class DataService {
 
   // Get opening capital information
   getOpeningCapital(): { totalOpeningStock: number; openingStockEntries: any[]; totalOpeningReceivables: number; openingReceivables: any[]; totalOpeningCapital: number } {
-    // For opening balance detection, we'll use a flexible approach:
-    // Consider receivables older than 1 year as opening balances
-    const cutoffDate = new Date();
-    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
-    
+
     // Opening stock entries
     const openingStockEntries = this.stockInEntries.filter(entry => entry.entryType === 'opening_stock');
     const totalOpeningStock = openingStockEntries.reduce((total, entry) => {
       return total + (entry.quantity * entry.purchasePrice);
     }, 0);
 
-    // Opening receivables (old receivables that existed before regular business operations)
+    // Opening receivables: use isOpeningBalance flag from General Debts Management
     const openingReceivables = this.generalDebts.filter(debt => 
-      debt.type === 'receivable' && debt.issueDate <= cutoffDate
+      debt.type === 'receivable' && debt.isOpeningBalance === true
     );
     const totalOpeningReceivables = openingReceivables.reduce((total, debt) => {
       return total + debt.originalAmount;

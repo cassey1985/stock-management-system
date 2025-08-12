@@ -58,6 +58,11 @@ const AppContent: React.FC = () => {
 
   const renderPage = () => {
     const isAdmin = user?.role === 'admin';
+    
+    // Debug logging
+    console.log('Current page:', currentPage);
+    console.log('User role:', user?.role);
+    console.log('Is admin:', isAdmin);
 
     switch (currentPage) {
       case 'dashboard':

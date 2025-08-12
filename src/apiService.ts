@@ -15,7 +15,10 @@ import type {
   LoginResponse,
   Customer,
   CustomerSearchResult,
-  CustomerProfile
+  CustomerProfile,
+  MultiProductSale,
+  MultiPayment,
+  OpeningCapital
 } from './types';
 
 // API Configuration - works for both development and production
@@ -181,6 +184,14 @@ class ApiService {
     });
   }
 
+  // Multi-Product Sales
+  async createMultiProductSale(sale: MultiProductSale): Promise<StockOutEntry[]> {
+    return this.request<StockOutEntry[]>('/stock-out/multi-product', {
+      method: 'POST',
+      body: JSON.stringify(sale),
+    });
+  }
+
   async updateStockOutEntry(id: string, entry: Partial<Omit<StockOutEntry, 'id' | 'createdAt'>>): Promise<StockOutEntry> {
     return this.request<StockOutEntry>(`/stock-out/${id}`, {
       method: 'PUT',
@@ -215,6 +226,14 @@ class ApiService {
     return this.request<Payment>('/payments', {
       method: 'POST',
       body: JSON.stringify(payment),
+    });
+  }
+
+  // Multi-Payment
+  async createMultiPayment(multiPayment: MultiPayment): Promise<Payment[]> {
+    return this.request<Payment[]>('/payments/multi-payment', {
+      method: 'POST',
+      body: JSON.stringify(multiPayment),
     });
   }
 

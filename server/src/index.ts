@@ -600,6 +600,17 @@ app.post('/api/stock-out', authenticateToken, requireSalesOrAdmin, (req, res) =>
   }
 });
 
+// Multi-Product Sales
+app.post('/api/stock-out/multi-product', authenticateToken, requireSalesOrAdmin, (req, res) => {
+  try {
+    const entries = dataService.addMultiProductSale(req.body);
+    res.status(201).json(entries);
+  } catch (error) {
+    console.error('Multi-product sale error:', error);
+    res.status(500).json({ error: 'Failed to create multi-product sale' });
+  }
+});
+
 app.put('/api/stock-out/:id', authenticateToken, requireAdmin, (req, res) => {
   try {
     const { id } = req.params;
@@ -668,6 +679,16 @@ app.post('/api/payments', authenticateToken, requireAdmin, (req, res) => {
     res.status(201).json(payment);
   } catch (error) {
     res.status(500).json({ error: 'Failed to create payment' });
+  }
+});
+
+app.post('/api/payments/multi-payment', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    const payments = dataService.addMultiPayment(req.body);
+    res.status(201).json(payments);
+  } catch (error) {
+    console.error('Multi-payment error:', error);
+    res.status(500).json({ error: 'Failed to create multi-payment' });
   }
 });
 

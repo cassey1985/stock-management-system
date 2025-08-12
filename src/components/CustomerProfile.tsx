@@ -128,9 +128,11 @@ const CustomerProfile: React.FC = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-PH', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
   };
 

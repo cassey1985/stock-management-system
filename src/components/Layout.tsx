@@ -124,6 +124,12 @@ const Layout: React.FC<LayoutProps> = ({ children, currentPage, onNavigate }) =>
 
         {/* Main Content */}
         <div className="flex-1 p-6">
+          {/* Page Indicator */}
+          <div className="mb-4 p-2 bg-blue-50 border border-blue-200 rounded">
+            <small className="text-blue-700">
+              Current Page: <strong>{currentPage}</strong> | User: <strong>{user?.fullName}</strong> | Role: <strong>{user?.role}</strong>
+            </small>
+          </div>
           <main>
             {children}
           </main>

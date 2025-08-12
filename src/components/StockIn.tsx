@@ -42,22 +42,43 @@ const StockIn: React.FC = () => {
     }
   };
 
-  const generateBatchNumber = (productCode: string) => {
+  const generateBatchNumber = (productCode: string, targetDate?: string) => {
     if (!productCode) return '';
     
-    const today = new Date();
-    const dateStr = today.getFullYear().toString().slice(-2) + 
-                   (today.getMonth() + 1).toString().padStart(2, '0') + 
-                   today.getDate().toString().padStart(2, '0');
+    // Use the target date if provided, otherwise use today
+    const dateToUse = targetDate ? new Date(targetDate) : new Date();
+    const dateStr = dateToUse.getFullYear().toString().slice(-2) + 
+                   (dateToUse.getMonth() + 1).toString().padStart(2, '0') + 
+                   dateToUse.getDate().toString().padStart(2, '0');
     
-    // Count existing batches for this product code today
-    const todaysBatches = stockEntries.filter(entry => {
-      const entryDate = new Date(entry.date);
-      const isToday = entryDate.toDateString() === today.toDateString();
-      return isToday && entry.productCode === productCode && entry.batchNumber?.startsWith(productCode);
+    // Get all existing batch numbers for this product and date combination
+    const matchingBatches = stockEntries.filter(entry => {
+      // Check if the batch number matches the expected format exactly
+      const expectedPrefix = `${productCode}-${dateStr}-`;
+      return entry.productCode === productCode && 
+             entry.batchNumber?.startsWith(expectedPrefix);
     });
     
-    const sequenceNumber = (todaysBatches.length + 1).toString().padStart(3, '0');
+    // Extract sequence numbers from existing batches and find the highest
+    const existingSequenceNumbers = matchingBatches
+      .map(entry => {
+        const parts = entry.batchNumber?.split('-');
+        if (parts && parts.length >= 3) {
+          const sequencePart = parts[2];
+          const num = parseInt(sequencePart, 10);
+          return isNaN(num) ? 0 : num;
+        }
+        return 0;
+      })
+      .filter(num => num > 0); // Only include valid positive numbers
+    
+    // Find the next available sequence number
+    const maxSequence = existingSequenceNumbers.length > 0 ? Math.max(...existingSequenceNumbers) : 0;
+    const nextSequence = maxSequence + 1;
+    const sequenceNumber = nextSequence.toString().padStart(3, '0');
+    
+    console.log(`Generating batch for ${productCode} on ${dateStr}: found ${matchingBatches.length} existing batches, max sequence: ${maxSequence}, next: ${nextSequence}`);
+    
     return `${productCode}-${dateStr}-${sequenceNumber}`;
   };
 
@@ -65,14 +86,14 @@ const StockIn: React.FC = () => {
     const newFormData = { ...formData, date };
     // If a product is already selected, regenerate the batch number for the new date
     if (formData.productCode) {
-      newFormData.batchNumber = generateBatchNumber(formData.productCode);
+      newFormData.batchNumber = generateBatchNumber(formData.productCode, date);
     }
     setFormData(newFormData);
   };
 
   const handleProductChange = (productCode: string) => {
     const product = products.find(p => p.code === productCode);
-    const autoBatchNumber = generateBatchNumber(productCode);
+    const autoBatchNumber = generateBatchNumber(productCode, formData.date);
     
     setFormData({
       ...formData,
@@ -128,14 +149,14 @@ const StockIn: React.FC = () => {
   const handleEditEntry = (entry: StockInEntry) => {
     setEditingEntry(entry);
     setFormData({
-      date: entry.date instanceof Date ? entry.date.toISOString().split('T')[0] : new Date(entry.date).toISOString().split('T')[0],
+      date: typeof entry.date === 'string' ? entry.date.split('T')[0] : new Date(entry.date).toISOString().split('T')[0],
       productCode: entry.productCode,
       productName: entry.productName,
       quantity: entry.quantity.toString(),
       purchasePrice: entry.purchasePrice.toString(),
       supplierName: entry.supplierName || '',
       batchNumber: entry.batchNumber || '',
-      expiryDate: entry.expiryDate ? (entry.expiryDate instanceof Date ? entry.expiryDate.toISOString().split('T')[0] : new Date(entry.expiryDate).toISOString().split('T')[0]) : '',
+      expiryDate: entry.expiryDate ? (typeof entry.expiryDate === 'string' ? entry.expiryDate.split('T')[0] : new Date(entry.expiryDate).toISOString().split('T')[0]) : '',
       entryType: entry.entryType,
       notes: entry.notes || ''
     });
@@ -321,7 +342,7 @@ const StockIn: React.FC = () => {
                   {formData.productCode && (
                     <button
                       type="button"
-                      onClick={() => setFormData({ ...formData, batchNumber: generateBatchNumber(formData.productCode) })}
+                      onClick={() => setFormData({ ...formData, batchNumber: generateBatchNumber(formData.productCode, formData.date) })}
                       className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm whitespace-nowrap"
                     >
                       Regenerate

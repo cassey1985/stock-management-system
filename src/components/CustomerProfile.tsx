@@ -63,14 +63,12 @@ const CustomerProfile: React.FC = () => {
   };
 
   const handleCustomerSelect = (customerName: string) => {
-    setSelectedCustomer(customerName);
     loadCustomerProfile(customerName);
     setViewMode('profile');
   };
 
   const handleBackToList = () => {
     setViewMode('list');
-    setSelectedCustomer('');
     setCustomerProfile(null);
   };
 
@@ -88,7 +86,6 @@ const CustomerProfile: React.FC = () => {
       
       // Go back to customer list and reload customers
       setViewMode('list');
-      setSelectedCustomer('');
       setCustomerProfile(null);
       await loadCustomers(); // Refresh the customer list
       
